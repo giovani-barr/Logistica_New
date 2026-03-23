@@ -611,6 +611,30 @@ export default function ConfigModal() {
     })
   }, [updateCurrentAba])
 
+  const applyLayoutPreset = useCallback((preset) => {
+    updateCurrentAba((current) => {
+      const order = current.componentes_ordem || []
+      const nextLayout = { ...(current.layout_config || {}) }
+
+      order.forEach((componentId, index) => {
+        let width = 'full'
+        if (preset === 'half') {
+          width = 'half'
+        } else if (preset === 'two_thirds') {
+          width = index % 2 === 0 ? 'two_thirds' : 'one_third'
+        } else if (preset === 'three_cols') {
+          width = 'one_third'
+        }
+        nextLayout[componentId] = { width }
+      })
+
+      return {
+        ...current,
+        layout_config: nextLayout,
+      }
+    })
+  }, [updateCurrentAba])
+
   const addComponent = (tipo) => {
     // Para SQL_COMPONENTS, sempre cria uma nova instância nomeada (tipo:instanceId)
     const instanceId = Math.random().toString(36).slice(2, 8)
@@ -1831,6 +1855,12 @@ export default function ConfigModal() {
                         <div className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)] gap-3">
                           <div>
                             <div className={`${cls.helper} mb-2`}>Arraste para definir a ordem dos blocos da aba SQL.</div>
+                            <div className="mb-2 flex flex-wrap gap-1.5">
+                              <button type="button" onClick={() => applyLayoutPreset('full')} className={`${cls.btn} ${cls.btnSecondary}`}>Preset 100%</button>
+                              <button type="button" onClick={() => applyLayoutPreset('half')} className={`${cls.btn} ${cls.btnSecondary}`}>Preset 50/50</button>
+                              <button type="button" onClick={() => applyLayoutPreset('two_thirds')} className={`${cls.btn} ${cls.btnSecondary}`}>Preset 66/33</button>
+                              <button type="button" onClick={() => applyLayoutPreset('three_cols')} className={`${cls.btn} ${cls.btnSecondary}`}>Preset 33/33/33</button>
+                            </div>
                             <div className={`rounded-lg border min-h-[140px] p-2 space-y-1 ${dark ? 'border-slate-700 bg-slate-950/40' : 'border-slate-200 bg-slate-50/70'}`}>
                               {(aba.componentes_ordem || []).map((component, index) => (
                                 (() => {
