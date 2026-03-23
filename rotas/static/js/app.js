@@ -1973,8 +1973,6 @@ window._showSegmentAlternatives = _showSegmentAlternatives;
 // ==========================================
 
 function recalculateRoute() {
-    if (stops.length < 2) return;
-
     _clearSegAlt();
 
     map.eachLayer(layer => {
@@ -1986,7 +1984,22 @@ function recalculateRoute() {
         }
     });
 
-    if (control) map.removeControl(control);
+    if (control) { map.removeControl(control); control = null; }
+
+    if (stops.length === 1 && stops[0].coords) {
+        const stop = stops[0];
+        const hasFixedStart = stop._fixedType === 'partida';
+        const markerNum = hasFixedStart ? '0' : '1';
+        const iconHtml = `<div class="num-icon">${markerNum}</div>`;
+        const icon = L.divIcon({ html: iconHtml, iconSize: [32, 32], iconAnchor: [16, 32], className: 'custom-number-icon' });
+        L.marker(L.latLng(stop.coords[0], stop.coords[1]), { icon, title: stop.name })
+            .bindPopup(`<b>${stop.name}</b>`)
+            .addTo(map);
+        map.setView(L.latLng(stop.coords[0], stop.coords[1]), 14);
+        return;
+    }
+
+    if (stops.length < 2) return;
 
     const waypoints = stops.map(s => L.latLng(s.coords[0], s.coords[1]));
 
