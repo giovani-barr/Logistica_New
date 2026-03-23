@@ -1081,6 +1081,7 @@ export default function ConfigModal() {
                       </div>
                       {expandedSections.kpis && (
                         <div className="mt-3 space-y-2">
+                          <p className={cls.helper}>Indicadores (KPIs) criam cards-resumo com agregações na coluna escolhida (contagem, soma, média, máximo, mínimo etc.).</p>
                           {[null, ...(aba.componentes_ordem || []).filter(c => c.startsWith('kpis:'))].map((compId, blockIdx) => {
                             const instId = compId ? compId.slice(5) : null
                             const isPrincipal = !compId

@@ -49,8 +49,10 @@ export default function DetailPanel({ data, config, expanded = false }) {
           if (!cell) return <div key={key} />
           if (cell.tipo === 'texto') {
             return (
-              <div key={key} className={`rounded ${dark ? 'text-slate-300' : 'text-slate-600'}`} style={{ padding: `${Math.max(10, pad)}px`, fontSize: `${Math.round((expanded ? 14 : 12) * scale)}px`, minHeight: `${minCellHeight}px` }}>
-                {cell.valor}
+              <div key={key} className={`rounded min-w-0 ${dark ? 'text-slate-300' : 'text-slate-600'}`} style={{ padding: `${Math.max(10, pad)}px`, fontSize: `${Math.round((expanded ? 14 : 12) * scale)}px`, minHeight: `${minCellHeight}px` }}>
+                <div className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap" title={cell.valor || ''}>
+                  {cell.valor}
+                </div>
               </div>
             )
           }
@@ -72,13 +74,23 @@ export default function DetailPanel({ data, config, expanded = false }) {
           return (
             <div
               key={key}
-              className={`rounded flex flex-col ${dark ? 'bg-slate-800/50' : 'bg-slate-100/80'}`}
+              className={`rounded min-w-0 flex flex-col ${dark ? 'bg-slate-800/50' : 'bg-slate-100/80'}`}
               style={{ justifyContent, textAlign, padding: `${Math.max(10, pad)}px`, minHeight: `${minCellHeight}px` }}
             >
               {cell.label && (
-                <div className={`${expanded ? 'mb-1' : 'mb-0.5'} ${dark ? 'text-slate-500' : 'text-slate-400'}`} style={{ fontSize: `${labelSize}px` }}>{cell.label}</div>
+                <div
+                  className={`min-w-0 overflow-hidden text-ellipsis whitespace-nowrap ${expanded ? 'mb-1' : 'mb-0.5'} ${dark ? 'text-slate-500' : 'text-slate-400'}`}
+                  style={{ fontSize: `${labelSize}px` }}
+                  title={cell.label}
+                >
+                  {cell.label}
+                </div>
               )}
-              <div className="font-semibold break-words" style={{ color: color ?? (dark ? '#e2e8f0' : '#0f172a'), fontSize: `${valueSize}px` }}>
+              <div
+                className="min-w-0 font-semibold overflow-hidden text-ellipsis whitespace-nowrap"
+                style={{ color: color ?? (dark ? '#e2e8f0' : '#0f172a'), fontSize: `${valueSize}px` }}
+                title={display}
+              >
                 {display}
               </div>
             </div>
