@@ -60,14 +60,72 @@ const COMPONENT_LABELS = {
 }
 
 const LAYOUT_WIDTH_OPTIONS = [
-  { value: 'full', label: '100% (linha inteira)' },
-  { value: 'two_thirds', label: '66% (dois terços)' },
-  { value: 'half', label: '50% (meia largura)' },
-  { value: 'one_third', label: '33% (um terço)' },
+  { value: 12.5, label: '1/8 (12,5%)' },
+  { value: 20, label: '20%' },
+  { value: 25, label: '2/8 (25%)' },
+  { value: 30, label: '30%' },
+  { value: 37.5, label: '3/8 (37,5%)' },
+  { value: 40, label: '40%' },
+  { value: 50, label: '4/8 (50%)' },
+  { value: 60, label: '60%' },
+  { value: 62.5, label: '5/8 (62,5%)' },
+  { value: 66.67, label: '66,67%' },
+  { value: 75, label: '6/8 (75%)' },
+  { value: 80, label: '80%' },
+  { value: 87.5, label: '7/8 (87,5%)' },
+  { value: 100, label: '8/8 (100%)' },
 ]
 
+const HEIGHT_DELTA_OPTIONS = [-50, -40, -30, -20, -10, 0, 10, 20, 30, 40, 50]
+
+const LEGACY_WIDTH_MAP = {
+  full: 100,
+  two_thirds: 66.67,
+  half: 50,
+  one_third: 33.33,
+}
+
+function clampNumber(value, min, max) {
+  return Math.min(max, Math.max(min, value))
+}
+
+function normalizeWidthPct(entry) {
+  if (Number.isFinite(Number(entry?.widthPct))) {
+    return clampNumber(Number(entry.widthPct), 12.5, 100)
+  }
+  if (Number.isFinite(Number(entry?.widthSteps))) {
+    return clampNumber(Number(entry.widthSteps), 1, 8) * 12.5
+  }
+  if (entry?.width && Number.isFinite(Number(entry.width))) {
+    return clampNumber(Number(entry.width), 12.5, 100)
+  }
+  if (entry?.width && Object.prototype.hasOwnProperty.call(LEGACY_WIDTH_MAP, entry.width)) {
+    return LEGACY_WIDTH_MAP[entry.width]
+  }
+  return 100
+}
+
+function normalizeHeightDeltaPct(entry) {
+  if (!Number.isFinite(Number(entry?.heightDeltaPct))) return 0
+  const rounded = Math.round(Number(entry.heightDeltaPct) / 10) * 10
+  return clampNumber(rounded, -50, 50)
+}
+
+function widthToClosestOption(widthPct) {
+  let closest = LAYOUT_WIDTH_OPTIONS[0].value
+  let minDiff = Number.POSITIVE_INFINITY
+  for (const opt of LAYOUT_WIDTH_OPTIONS) {
+    const diff = Math.abs(Number(opt.value) - Number(widthPct))
+    if (diff < minDiff) {
+      minDiff = diff
+      closest = opt.value
+    }
+  }
+  return Number(closest)
+}
+
 const LAYOUT_WIDTH_LABEL = LAYOUT_WIDTH_OPTIONS.reduce((acc, item) => {
-  acc[item.value] = item.label
+  acc[String(item.value)] = item.label
   return acc
 }, {})
 
@@ -144,10 +202,11 @@ function extractSqlParams(sqlText) {
 function normalizeSqlDraft(aba) {
   const rawLayout = aba.layout_config || {}
   const normalizedLayout = Object.entries(rawLayout).reduce((acc, [key, value]) => {
-    const width = LAYOUT_WIDTH_OPTIONS.some((opt) => opt.value === value?.width)
-      ? value.width
-      : 'full'
-    acc[key] = { width }
+    const entry = value || {}
+    acc[key] = {
+      widthPct: widthToClosestOption(normalizeWidthPct(entry)),
+      heightDeltaPct: normalizeHeightDeltaPct(entry),
+    }
     return acc
   }, {})
 
@@ -429,7 +488,7 @@ export default function ConfigModal() {
       componentes_ordem: [...(current.componentes_ordem || []), compId],
       layout_config: {
         ...(current.layout_config || {}),
-        [compId]: { width: 'full' },
+        [compId]: { widthPct: 100, heightDeltaPct: 0 },
       },
     }))
   }
@@ -529,7 +588,7 @@ export default function ConfigModal() {
       componentes_ordem: [...(current.componentes_ordem || []), key],
       layout_config: {
         ...(current.layout_config || {}),
-        [key]: { width: 'full' },
+        [key]: { widthPct: 100, heightDeltaPct: 0 },
       },
     }))
   }
@@ -587,25 +646,26 @@ export default function ConfigModal() {
 
   const getComponentLayout = useCallback((componentId) => {
     const entry = (aba?.layout_config || {})[componentId] || {}
-    const width = LAYOUT_WIDTH_OPTIONS.some((opt) => opt.value === entry.width)
-      ? entry.width
-      : 'full'
-    return { width }
+    return {
+      widthPct: widthToClosestOption(normalizeWidthPct(entry)),
+      heightDeltaPct: normalizeHeightDeltaPct(entry),
+    }
   }, [aba?.layout_config])
 
   const setComponentLayout = useCallback((componentId, patch) => {
     updateCurrentAba((current) => {
       const currentEntry = (current.layout_config || {})[componentId] || {}
-      const nextWidth = patch.width ?? currentEntry.width ?? 'full'
-      const width = LAYOUT_WIDTH_OPTIONS.some((opt) => opt.value === nextWidth)
-        ? nextWidth
-        : 'full'
+      const nextWidthPct = patch.widthPct ?? normalizeWidthPct(currentEntry)
+      const nextHeightDeltaPct = patch.heightDeltaPct ?? normalizeHeightDeltaPct(currentEntry)
 
       return {
         ...current,
         layout_config: {
           ...(current.layout_config || {}),
-          [componentId]: { width },
+          [componentId]: {
+            widthPct: widthToClosestOption(nextWidthPct),
+            heightDeltaPct: normalizeHeightDeltaPct({ heightDeltaPct: nextHeightDeltaPct }),
+          },
         },
       }
     })
@@ -617,15 +677,18 @@ export default function ConfigModal() {
       const nextLayout = { ...(current.layout_config || {}) }
 
       order.forEach((componentId, index) => {
-        let width = 'full'
+        let widthPct = 100
         if (preset === 'half') {
-          width = 'half'
+          widthPct = 50
         } else if (preset === 'two_thirds') {
-          width = index % 2 === 0 ? 'two_thirds' : 'one_third'
+          widthPct = index % 2 === 0 ? 62.5 : 37.5
         } else if (preset === 'three_cols') {
-          width = 'one_third'
+          widthPct = index % 3 === 2 ? 25 : 37.5
         }
-        nextLayout[componentId] = { width }
+        nextLayout[componentId] = {
+          widthPct: widthToClosestOption(widthPct),
+          heightDeltaPct: normalizeHeightDeltaPct(nextLayout[componentId] || {}),
+        }
       })
 
       return {
@@ -646,7 +709,7 @@ export default function ConfigModal() {
       widget_configs: { ...(current.widget_configs || {}), [instanceId]: defaultCfg },
       layout_config: {
         ...(current.layout_config || {}),
-        [compId]: { width: 'full' },
+        [compId]: { widthPct: 100, heightDeltaPct: 0 },
       },
     }))
     return instanceId
@@ -683,7 +746,7 @@ export default function ConfigModal() {
         Object.entries(current.layout_config || {}).filter(([key]) => (nextOrder || []).includes(key))
       )
       ;(nextOrder || []).forEach((key) => {
-        if (!nextLayout[key]) nextLayout[key] = { width: 'full' }
+        if (!nextLayout[key]) nextLayout[key] = { widthPct: 100, heightDeltaPct: 0 }
       })
 
       return normalizeSqlDraft({
@@ -1888,7 +1951,7 @@ export default function ConfigModal() {
                                           ...current,
                                           componentes_ordem: unique(next),
                                           widget_configs: { ...(current.widget_configs || {}), [instanceId]: defaultCfg },
-                                          layout_config: { ...(current.layout_config || {}), [compId]: { width: 'full' } },
+                                          layout_config: { ...(current.layout_config || {}), [compId]: { widthPct: 100, heightDeltaPct: 0 } },
                                         }
                                       })
                                     }
@@ -1898,13 +1961,25 @@ export default function ConfigModal() {
                                   <GripVertical size={11} className="opacity-40" />
                                   <span className="flex-1">{getCompLabel(component, aba.widget_configs, aba.sqls_extras, aba.componentes_ordem)}</span>
                                   <select
-                                    value={layout.width}
-                                    onChange={(event) => setComponentLayout(component, { width: event.target.value })}
+                                    value={String(layout.widthPct)}
+                                    onChange={(event) => setComponentLayout(component, { widthPct: Number(event.target.value) })}
                                     className={`rounded-md border px-2 py-1 text-[11px] ${dark ? 'bg-slate-900 border-slate-600 text-slate-200' : 'bg-white border-slate-300 text-slate-700'}`}
-                                    title={`Largura: ${LAYOUT_WIDTH_LABEL[layout.width] || layout.width}`}
+                                    title={`Largura: ${LAYOUT_WIDTH_LABEL[String(layout.widthPct)] || layout.widthPct}`}
                                   >
                                     {LAYOUT_WIDTH_OPTIONS.map((opt) => (
-                                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                      <option key={String(opt.value)} value={String(opt.value)}>{opt.label}</option>
+                                    ))}
+                                  </select>
+                                  <select
+                                    value={String(layout.heightDeltaPct)}
+                                    onChange={(event) => setComponentLayout(component, { heightDeltaPct: Number(event.target.value) })}
+                                    className={`rounded-md border px-2 py-1 text-[11px] ${dark ? 'bg-slate-900 border-slate-600 text-slate-200' : 'bg-white border-slate-300 text-slate-700'}`}
+                                    title="Ajuste de altura"
+                                  >
+                                    {HEIGHT_DELTA_OPTIONS.map((pct) => (
+                                      <option key={String(pct)} value={String(pct)}>
+                                        {pct > 0 ? `+${pct}%` : `${pct}%`}
+                                      </option>
                                     ))}
                                   </select>
                                   <button onClick={() => removeComponent(component)} className={cls.btnDanger}><Trash2 size={12} /></button>

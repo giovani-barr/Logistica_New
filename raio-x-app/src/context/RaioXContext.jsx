@@ -34,12 +34,47 @@ function normalizeLayoutPrefs(prefs) {
   }
 }
 
+const WIDTH_BY_LEGACY_NAME = {
+  full: 100,
+  two_thirds: 66.67,
+  half: 50,
+  one_third: 33.33,
+}
+
+function clampNumber(value, min, max) {
+  return Math.min(max, Math.max(min, value))
+}
+
+function normalizeWidthPct(entry) {
+  if (Number.isFinite(Number(entry?.widthPct))) {
+    return clampNumber(Number(entry.widthPct), 12.5, 100)
+  }
+  if (Number.isFinite(Number(entry?.widthSteps))) {
+    return clampNumber(Number(entry.widthSteps), 1, 8) * 12.5
+  }
+  if (entry?.width && Number.isFinite(Number(entry.width))) {
+    return clampNumber(Number(entry.width), 12.5, 100)
+  }
+  if (entry?.width && Object.prototype.hasOwnProperty.call(WIDTH_BY_LEGACY_NAME, entry.width)) {
+    return WIDTH_BY_LEGACY_NAME[entry.width]
+  }
+  return 100
+}
+
+function normalizeHeightDeltaPct(entry) {
+  if (!Number.isFinite(Number(entry?.heightDeltaPct))) return 0
+  const rounded = Math.round(Number(entry.heightDeltaPct) / 10) * 10
+  return clampNumber(rounded, -50, 50)
+}
+
 function normalizeLayoutConfig(layoutConfig) {
-  const allowed = new Set(['full', 'two_thirds', 'half', 'one_third'])
   const raw = layoutConfig || {}
   return Object.entries(raw).reduce((acc, [key, value]) => {
-    const width = allowed.has(value?.width) ? value.width : 'full'
-    acc[key] = { width }
+    const entry = value || {}
+    acc[key] = {
+      widthPct: normalizeWidthPct(entry),
+      heightDeltaPct: normalizeHeightDeltaPct(entry),
+    }
     return acc
   }, {})
 }

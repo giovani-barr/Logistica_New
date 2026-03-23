@@ -38,16 +38,43 @@ function parseCompId(id) {
   return { base: id }
 }
 
-const WIDTH_SPAN = {
-  full: 12,
-  two_thirds: 8,
-  half: 6,
-  one_third: 4,
+const GRID_COLUMNS = 8
+
+const WIDTH_BY_LEGACY_NAME = {
+  full: 100,
+  two_thirds: 66.67,
+  half: 50,
+  one_third: 33.33,
 }
 
-function getLayoutWidth(layoutConfig, componentId) {
-  const raw = layoutConfig?.[componentId]?.width || 'full'
-  return Object.prototype.hasOwnProperty.call(WIDTH_SPAN, raw) ? raw : 'full'
+function clampNumber(value, min, max) {
+  return Math.min(max, Math.max(min, value))
+}
+
+function getLayoutEntry(layoutConfig, componentId) {
+  const raw = layoutConfig?.[componentId] || {}
+  let widthPct
+
+  if (Number.isFinite(Number(raw.widthPct))) {
+    widthPct = Number(raw.widthPct)
+  } else if (Number.isFinite(Number(raw.widthSteps))) {
+    widthPct = Number(raw.widthSteps) * 12.5
+  } else if (raw.width && Number.isFinite(Number(raw.width))) {
+    widthPct = Number(raw.width)
+  } else if (raw.width && Object.prototype.hasOwnProperty.call(WIDTH_BY_LEGACY_NAME, raw.width)) {
+    widthPct = WIDTH_BY_LEGACY_NAME[raw.width]
+  } else {
+    widthPct = 100
+  }
+
+  const heightDeltaPct = Number.isFinite(Number(raw.heightDeltaPct))
+    ? clampNumber(Math.round(Number(raw.heightDeltaPct) / 10) * 10, -50, 50)
+    : 0
+
+  return {
+    widthPct: clampNumber(widthPct, 12.5, 100),
+    heightDeltaPct,
+  }
 }
 
 // Agrupa componentes por linhas com base na largura configurada (grade de 12 colunas)
@@ -57,19 +84,19 @@ function buildLayoutRows(ordem, layoutConfig) {
   let used = 0
 
   for (const id of ordem) {
-    const width = getLayoutWidth(layoutConfig, id)
-    const span = WIDTH_SPAN[width] || WIDTH_SPAN.full
+    const layout = getLayoutEntry(layoutConfig, id)
+    const span = clampNumber(Math.round(layout.widthPct / 12.5), 1, GRID_COLUMNS)
 
-    if (used + span > 12 && current.length) {
+    if (used + span > GRID_COLUMNS && current.length) {
       rows.push(current)
       current = []
       used = 0
     }
 
-    current.push({ id, width, span })
+    current.push({ id, span, layout })
     used += span
 
-    if (used >= 12) {
+    if (used >= GRID_COLUMNS) {
       rows.push(current)
       current = []
       used = 0
@@ -94,6 +121,13 @@ export default function DashboardGrid({ aba, data, extraCache = {} }) {
     if (Number.isFinite(Number(configured))) return Number(configured)
     return DEFAULT_HEIGHTS[key] ?? DEFAULT_HEIGHTS[baseKey] ?? 320
   }, [layoutPrefs])
+
+  const getEffectiveWidgetHeight = useCallback((heightKey, componentId) => {
+    const baseHeight = getWidgetHeight(heightKey)
+    const layout = getLayoutEntry(aba.layout_config || {}, componentId)
+    const adjusted = Math.round(baseHeight * (1 + (layout.heightDeltaPct / 100)))
+    return clampNumber(adjusted, 80, 1200)
+  }, [getWidgetHeight, aba.layout_config])
 
   // Colunas disponíveis do SQL principal
   const columns = useMemo(() => {
@@ -279,17 +313,21 @@ export default function DashboardGrid({ aba, data, extraCache = {} }) {
   )
 
   const getDesktopSpanClass = (span) => {
-    if (span >= 12) return 'lg:col-span-12'
-    if (span === 8) return 'lg:col-span-8'
+    if (span >= 8) return 'lg:col-span-8'
+    if (span === 7) return 'lg:col-span-7'
     if (span === 6) return 'lg:col-span-6'
+    if (span === 5) return 'lg:col-span-5'
     if (span === 4) return 'lg:col-span-4'
-    return 'lg:col-span-12'
+    if (span === 3) return 'lg:col-span-3'
+    if (span === 2) return 'lg:col-span-2'
+    if (span === 1) return 'lg:col-span-1'
+    return 'lg:col-span-8'
   }
 
   return (
     <div className="flex-1 overflow-y-auto flex flex-col" style={{ padding: `${widgetPadding}px`, gap: `${gridGap}px` }}>
       {rows.map((row, rowIdx) => (
-        <div key={`row-${rowIdx}`} className="grid grid-cols-1 lg:grid-cols-12" style={{ gap: `${gridGap}px` }}>
+        <div key={`row-${rowIdx}`} className="grid grid-cols-1 lg:grid-cols-8" style={{ gap: `${gridGap}px` }}>
           {row.map((item) => {
             const { id, span } = item
             const { base, sub } = parseCompId(id)
@@ -300,7 +338,7 @@ export default function DashboardGrid({ aba, data, extraCache = {} }) {
               const { widgetId } = parseCompId(id)
               const config = (aba.widget_configs || {})[widgetId] || {}
               return (
-                <div key={id} className={`min-w-0 ${spanClass}`}>
+                <div key={id} className={`min-w-0 ${spanClass}`} style={{ height: getEffectiveWidgetHeight('campo', id) }}>
                   <FieldWidget
                     widgetId={widgetId}
                     config={config}
@@ -316,7 +354,7 @@ export default function DashboardGrid({ aba, data, extraCache = {} }) {
             const heightKey = base === 'sql_extra' ? `sql_${sub}` : base
             return (
               <div key={id} className={`min-w-0 ${spanClass}`}>
-                <WidgetCard id={id} height={getWidgetHeight(heightKey || base)}>
+                <WidgetCard id={id} height={getEffectiveWidgetHeight(heightKey || base, id)}>
                   {renderWidget(id, expanded)}
                 </WidgetCard>
               </div>
