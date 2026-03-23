@@ -1,0 +1,736 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if is_new %}Novo Layout{% else %}Editar: {{ layout.nome }}{% endif %} - Editor de Relatórios</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #2d2d30; color: #cccccc; overflow: hidden; }
+        
+        /* Top Toolbar */
+        .top-toolbar { background: #1e1e1e; border-bottom: 1px solid #3c3c3c; padding: 8px 16px; display: flex; justify-content: space-between; align-items: center; height: 56px; }
+        .toolbar-left, .toolbar-right { display: flex; gap: 8px; align-items: center; }
+        .toolbar-title { color: #fff; font-size: 16px; font-weight: 600; margin-right: 24px; }
+        
+        .toolbar-btn { background: #3c3c3c; color: #cccccc; border: 1px solid #555; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+        .toolbar-btn:hover { background: #505050; border-color: #666; }
+        .toolbar-btn.primary { background: #0e639c; border-color: #1177bb; color: #fff; }
+        .toolbar-btn.primary:hover { background: #1177bb; }
+        .toolbar-btn.success { background: #0e7c34; border-color: #13a148; color: #fff; }
+        .toolbar-btn.success:hover { background: #13a148; }
+        
+        .toolbar-separator { width: 1px; height: 24px; background: #3c3c3c; margin: 0 8px; }
+        
+        /* Query Info Badge */
+        .query-info-badge { display: inline-flex; align-items: center; gap: 8px; background: #1e1e1e; border: 1px solid #3c3c3c; padding: 4px 12px; border-radius: 4px; font-size: 11px; color: #969696; margin-left: 12px; }
+        .query-info-badge.has-query { border-color: #13a148; background: rgba(19, 161, 72, 0.1); }
+        .query-info-badge.no-query { border-color: #f48771; background: rgba(244, 135, 113, 0.1); }
+        .query-info-icon { font-size: 14px; }
+        .query-info-text { line-height: 1.2; }
+        .query-info-label { color: #fff; font-weight: 600; }
+        .query-info-detail { color: #969696; font-size: 10px; margin-top: 2px; }
+        
+        /* Main Layout */
+        .main-layout { display: flex; height: calc(100vh - 56px); }
+        
+        /* Left Sidebar - Toolbox */
+        .left-sidebar { width: 220px; background: #252526; border-right: 1px solid #3c3c3c; display: flex; flex-direction: column; }
+        .sidebar-header { padding: 12px 16px; background: #2d2d30; border-bottom: 1px solid #3c3c3c; font-weight: 600; font-size: 13px; color: #fff; }
+        .toolbox { flex: 1; overflow-y: auto; padding: 12px; }
+        
+        .toolbox-category { margin-bottom: 16px; }
+        .category-title { color: #969696; font-size: 11px; font-weight: 600; text-transform: uppercase; margin-bottom: 8px; padding: 0 8px; }
+        .toolbox-item { background: #3c3c3c; padding: 10px 12px; margin-bottom: 6px; border-radius: 4px; cursor: move; display: flex; align-items: center; gap: 10px; transition: all 0.2s; border: 1px solid #555; }
+        .toolbox-item:hover { background: #505050; border-color: #666; }
+        .toolbox-item-icon { font-size: 18px; width: 24px; text-align: center; }
+        .toolbox-item-label { font-size: 13px; flex: 1; }
+        
+        /* Center - Designer Canvas */
+        .center-area { flex: 1; display: flex; flex-direction: column; background: #1e1e1e; }
+        .canvas-toolbar { background: #2d2d30; border-bottom: 1px solid #3c3c3c; padding: 8px 16px; display: flex; gap: 12px; align-items: center; }
+        .canvas-toolbar label { font-size: 12px; color: #969696; }
+        .canvas-toolbar select, .canvas-toolbar input { background: #3c3c3c; color: #cccccc; border: 1px solid #555; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+        
+        .canvas-container { flex: 1; overflow: auto; padding: 24px; position: relative; }
+        .canvas-page { background:  #fff; margin: 0 auto; box-shadow: 0 4px 16px rgba(0,0,0,0.5); position: relative; }
+        
+        /* Bands */
+        .band { border: 2px solid #0e639c; position: relative; background: #fafafa; }
+        .band.selected { border-color: #1177bb; box-shadow: 0 0 0 2px rgba(17, 119, 187, 0.3); }
+        .band-header { background: #0e639c; color: #fff; padding: 4px 8px; font-size: 11px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; cursor: grab; }
+        .band-header:active { cursor: grabbing; }
+        .band-body { position: relative; min-height: 30px; height: calc(100% - 28px); }
+        .band-handle { position: absolute; bottom: -4px; left: 0; right: 0; height: 8px; cursor: ns-resize; background: transparent; z-index: 10; }
+        .band-handle:hover { background: rgba(14, 99, 156, 0.3); }
+        
+        /* Elements - melhor controle de z-index */
+        .report-element { 
+            position: absolute !important; 
+            border: 1px solid #999; 
+            background: rgba(255,255,255,0.9); 
+            padding: 4px; 
+            cursor: move; 
+            font-size: 12px; 
+            overflow: hidden; 
+            z-index: 1;
+            pointer-events: auto !important; /* Garantir que todos os elementos sejam clicáveis */
+            min-width: 20px;
+            min-height: 10px;
+        }
+        .report-element[data-element-type="aggregate"] {
+            border: 2px solid #ff6b35 !important; /* Borda laranja para elementos Sum */
+            background: rgba(255, 107, 53, 0.1) !important;
+            font-weight: bold;
+        }
+        .report-element.selected { 
+            border: 2px solid #1177bb !important; 
+            z-index: 99999 !important; 
+            background: rgba(255,255,255,0.95) !important; /* Background mais opaco para elemento selecionado */
+            box-shadow: 0 2px 8px rgba(17, 119, 187, 0.3) !important;
+        }
+        .report-element.selected::after { 
+            content: ''; 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            right: 0; 
+            bottom: 0; 
+            border: 1px dashed #1177bb; 
+            pointer-events: none; 
+        }
+        .element-resize-handle { 
+            position: absolute; 
+            width: 8px; 
+            height: 8px; 
+            background: #1177bb; 
+            border: 1px solid #fff; 
+            z-index: 10000; 
+            pointer-events: auto;
+        }
+        .element-resize-handle.nw { top: -4px; left: -4px; cursor: nw-resize; }
+        .element-resize-handle.ne { top: -4px; right: -4px; cursor: ne-resize; }
+        .element-resize-handle.sw { bottom: -4px; left: -4px; cursor: sw-resize; }
+        .element-resize-handle.se { bottom: -4px; right: -4px; cursor: se-resize; }
+        .element-resize-handle.n { top: -4px; left: 50%; transform: translateX(-50%); cursor: n-resize; }
+        .element-resize-handle.s { bottom: -4px; left: 50%; transform: translateX(-50%); cursor: s-resize; }
+        .element-resize-handle.w { top: 50%; left: -4px; transform: translateY(-50%); cursor: w-resize; }
+        .element-resize-handle.e { top: 50%; right: -4px; transform: translateY(-50%); cursor: e-resize; }
+        
+        /* Right Sidebar - Properties & Fields */
+        .right-sidebar { width: 320px; background: #252526; border-left: 1px solid #3c3c3c; display: flex; flex-direction: column; }
+        .sidebar-tabs { display: flex; background: #2d2d30; border-bottom: 1px solid #3c3c3c; }
+        .sidebar-tab { flex: 1; padding: 10px; text-align: center; font-size: 12px; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; }
+        .sidebar-tab:hover { background: #3c3c3c; }
+        .sidebar-tab.active { border-bottom-color: #0e639c; color: #fff; background: #1e1e1e; }
+        
+        .sidebar-content { flex: 1; overflow-y: auto; padding: 16px; }
+        .sidebar-content.hidden { display: none; }
+        
+        .property-group { margin-bottom: 20px; }
+        .property-group-title { color: #969696; font-size: 11px; font-weight: 600; text-transform: uppercase; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #3c3c3c; }
+        .property-item { margin-bottom: 12px; }
+        .property-label { display: block; font-size: 12px; color: #969696; margin-bottom: 4px; }
+        .property-input { width: 100%; background: #3c3c3c; color: #cccccc; border: 1px solid #555; padding: 6px 8px; border-radius: 4px; font-size: 12px; }
+        .property-input:focus { outline: none; border-color: #0e639c; }
+        .property-checkbox { margin-right: 6px; }
+        
+        .fields-list { display: flex; flex-direction: column; gap: 6px; }
+        .field-item { background: #3c3c3c; padding: 8px 12px; border-radius: 4px; cursor: grab; display: flex; align-items: center; gap: 8px; border: 1px solid #555; transition: all 0.2s; }
+        .field-item:hover { background: #505050; border-color: #666; }
+        .field-item:active { cursor: grabbing; }
+        .field-icon { font-size: 14px; }
+        .field-name { font-size: 12px; flex: 1; }
+        
+        .bands-list { display: flex; flex-direction: column; gap: 6px; }
+        .band-list-item { background: #3c3c3c; padding: 10px 12px; border-radius: 4px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border: 1px solid #555; transition: all 0.2s; }
+        .band-list-item:hover { background: #505050; border-color: #666; }
+        .band-list-item.active { border-color: #0e639c; background: #1e3a52; }
+        .band-list-item-name { font-size: 13px; }
+        .band-list-item-height { font-size: 11px; color: #969696; }
+        
+        /* Color Picker */
+        .color-picker-wrapper { display: flex; gap: 8px; align-items: center; }
+        .color-preview { width: 32px; height: 24px; border: 1px solid #555; border-radius: 4px; cursor: pointer; }
+        
+        /* Scrollbars */
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: #1e1e1e; }
+        ::-webkit-scrollbar-thumb { background: #555; border-radius: 5px; }
+        ::-webkit-scrollbar-thumb:hover { background: #666; }
+        
+        /* Dropdown */
+        .dropdown { position: relative; display: inline-block; }
+        .dropdown-content { display: none; position: absolute; background: #2d2d30; border: 1px solid #555; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 1000; min-width: 160px; }
+        .dropdown.show .dropdown-content { display: block; }
+        .dropdown-item { padding: 8px 16px; cursor: pointer; font-size: 13px; border-bottom: 1px solid #3c3c3c; }
+        .dropdown-item:hover { background: #3c3c3c; }
+        .dropdown-item:last-child { border-bottom: none; }
+        
+        /* Context Menu */
+        .context-menu { position: fixed; background: #2d2d30; border: 1px solid #555; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 10000; display: none; min-width: 180px; }
+        .context-menu.show { display: block; }
+        .context-menu-item { padding: 8px 16px; cursor: pointer; font-size: 13px; border-bottom: 1px solid #3c3c3c; display: flex; align-items: center; gap: 8px; }
+        .context-menu-item:hover { background: #3c3c3c; }
+        .context-menu-item:last-child { border-bottom: none; }
+        .context-menu-separator { height: 1px; background: #3c3c3c; margin: 4px 0; }
+        
+        /* Toast Notifications */
+        .toast-container { position: fixed; top: 70px; right: 20px; z-index: 10000; display: flex; flex-direction: column; gap: 10px; }
+        .toast { background: #2d2d30; border: 1px solid #555; border-radius: 6px; padding: 12px 16px; min-width: 280px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: flex; align-items: center; gap: 12px; animation: slideIn 0.3s ease; }
+        .toast.success { border-left: 4px solid #13a148; }
+        .toast.error { border-left: 4px solid #f14c4c; }
+        .toast.info { border-left: 4px solid #0e639c; }
+        @keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        
+        /* Modal */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 9999; align-items: center; justify-content: center; }
+        .modal.show { display: flex; }
+        .modal-content { background: #2d2d30; border-radius: 8px; padding: 24px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.8); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-title { font-size: 18px; font-weight: 600; color: #fff; }
+        .modal-close { background: #3c3c3c; border: none; color: #cccccc; font-size: 20px; cursor: pointer; padding: 4px 10px; border-radius: 4px; }
+        .modal-close:hover { background: #505050; }
+        .modal-body { color: #cccccc; }
+        .modal-footer { margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px; }
+        
+        /* PDF Preview Modal */
+        .pdf-preview-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 2000; }
+        .pdf-preview-modal.show { display: flex; }
+        .pdf-preview-content { background: #2d2d30; border-radius: 8px; width: 90%; height: 90%; max-width: 1200px; display: flex; flex-direction: column; box-shadow: 0 8px 32px rgba(0,0,0,0.8); }
+        .pdf-preview-header { padding: 16px 24px; border-bottom: 1px solid #3c3c3c; display: flex; justify-content: space-between; align-items: center; }
+        .pdf-preview-title { color: #fff; font-size: 18px; font-weight: 600; }
+        .pdf-preview-actions { display: flex; gap: 8px; align-items: center; }
+        .pdf-preview-body { flex: 1; padding: 0; position: relative; overflow: hidden; }
+        .pdf-preview-frame { width: 100%; height: 100%; border: none; background: #fff; }
+        .pdf-loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #cccccc; font-size: 16px; }
+        
+        .form-group { margin-bottom: 16px; }
+        .form-label { display: block; font-size: 13px; color: #969696; margin-bottom: 6px; }
+        .form-input { width: 100%; background: #3c3c3c; color: #cccccc; border: 1px solid #555; padding: 8px 12px; border-radius: 4px; font-size: 13px; }
+        .form-input:focus { outline: none; border-color: #0e639c; }
+        
+        /* Ruler */
+        .ruler-horizontal { height: 20px; background: #2d2d30; border-bottom: 1px solid #3c3c3c; position: relative; }
+        .ruler-vertical { width: 20px; background: #2d2d30; border-right: 1px solid #3c3c3c; position: relative; }
+    </style>
+</head>
+<body>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Context Menu -->
+<div class="context-menu" id="contextMenu">
+    <div class="context-menu-item" data-action="copy">📋 Copiar</div>
+    <div class="context-menu-item" data-action="paste">📄 Colar</div>
+    <div class="context-menu-item" data-action="duplicate">📑 Duplicar</div>
+    <div class="context-menu-separator"></div>
+    <div class="context-menu-item" data-action="bring-front">⬆️ Trazer para Frente</div>
+    <div class="context-menu-item" data-action="send-back">⬇️ Enviar para Trás</div>
+    <div class="context-menu-separator"></div>
+    <div class="context-menu-item" data-action="delete">🗑️ Deletar</div>
+</div>
+
+<!-- Top Toolbar -->
+<div class="top-toolbar">
+    <div class="toolbar-left">
+        <a href="{% url 'rotas:report_designer_list' %}" class="toolbar-btn" title="Voltar">
+            ← Voltar
+        </a>
+        <div class="toolbar-separator"></div>
+        <span class="toolbar-title">{% if is_new %}✨ Novo Layout{% else %}✏️ {{ layout.nome }}{% endif %}</span>
+        
+        <!-- Query Info Badge -->
+        {% if query_ativa %}
+        <div class="query-info-badge has-query" title="Campos sincronizados com a configuração dos cards">
+            <span class="query-info-icon">🔗</span>
+            <div class="query-info-text">
+                <div class="query-info-label">{{ campos_count }} campos SQL</div>
+                <div class="query-info-detail">Query Ativa: ID {{ query_ativa.id }}</div>
+            </div>
+        </div>
+        {% else %}
+        <div class="query-info-badge no-query" title="Nenhuma query SQL ativa configurada. Configure em Configurações.">
+            <span class="query-info-icon">⚠️</span>
+            <div class="query-info-text">
+                <div class="query-info-label">{{ campos_count }} campos padrão</div>
+                <div class="query-info-detail">Configure SQL nas Configurações</div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    <div class="toolbar-right">
+        <button class="toolbar-btn" id="btnUndo" title="Desfazer (Ctrl+Z)" disabled>
+            ↶ Desfazer
+        </button>
+        <button class="toolbar-btn" id="btnRedo" title="Refazer (Ctrl+Y)" disabled>
+            ↷ Refazer
+        </button>
+        <div class="toolbar-separator"></div>
+        <button class="toolbar-btn" id="btnPreview" title="Visualizar">
+            👁️ Preview
+        </button>
+        <div class="dropdown" id="exportDropdown">
+            <button class="toolbar-btn" onclick="document.getElementById('exportDropdown').classList.toggle('show')">
+                📤 Exportar ▾
+            </button>
+            <div class="dropdown-content" style="right:0; left:auto;">
+                <div class="dropdown-item" onclick="previewReport(); document.getElementById('exportDropdown').classList.remove('show')">👁️ Preview PDF</div>
+                <div class="dropdown-item" onclick="exportReport('excel'); document.getElementById('exportDropdown').classList.remove('show')">📊 Excel (.xlsx)</div>
+                <div class="dropdown-item" onclick="exportReport('csv'); document.getElementById('exportDropdown').classList.remove('show')">📄 CSV</div>
+                <div class="dropdown-item" onclick="exportReport('html'); document.getElementById('exportDropdown').classList.remove('show')">🌐 HTML</div>
+            </div>
+        </div>
+        <button class="toolbar-btn success" id="btnSave" title="Salvar (Ctrl+S)">
+            💾 Salvar
+        </button>
+        <button class="toolbar-btn primary" id="btnSaveAs" title="Salvar Como...">
+            💾 Salvar Como
+        </button>
+    </div>
+</div>
+
+<!-- Main Layout -->
+<div class="main-layout">
+    <!-- Left Sidebar - Toolbox -->
+    <div class="left-sidebar">
+        <div class="sidebar-header">🧰 Ferramentas</div>
+        <div class="toolbox">
+            <div class="toolbox-category">
+                <div class="category-title">Textos</div>
+                <div class="toolbox-item" draggable="true" data-element-type="text">
+                    <div class="toolbox-item-icon">📝</div>
+                    <div class="toolbox-item-label">Texto Estático</div>
+                </div>
+                <div class="toolbox-item" draggable="true" data-element-type="field">
+                    <div class="toolbox-item-icon">🔤</div>
+                    <div class="toolbox-item-label">Campo de Dados</div>
+                </div>
+                <div class="toolbox-item" draggable="true" data-element-type="expression">
+                    <div class="toolbox-item-icon">🧮</div>
+                    <div class="toolbox-item-label">Expressão</div>
+                </div>
+            </div>
+            
+            <div class="toolbox-category">
+                <div class="category-title">Formas</div>
+                <div class="toolbox-item" draggable="true" data-element-type="line">
+                    <div class="toolbox-item-icon">─</div>
+                    <div class="toolbox-item-label">Linha</div>
+                </div>
+                <div class="toolbox-item" draggable="true" data-element-type="rectangle">
+                    <div class="toolbox-item-icon">▭</div>
+                    <div class="toolbox-item-label">Retângulo</div>
+                </div>
+            </div>
+            
+            <div class="toolbox-category">
+                <div class="category-title">Multimídia</div>
+                <div class="toolbox-item" draggable="true" data-element-type="image">
+                    <div class="toolbox-item-icon">🖼️</div>
+                    <div class="toolbox-item-label">Imagem</div>
+                </div>
+            </div>
+            
+            <div class="toolbox-category">
+                <div class="category-title">Códigos</div>
+                <div class="toolbox-item" draggable="true" data-element-type="barcode">
+                    <div class="toolbox-item-icon">📊</div>
+                    <div class="toolbox-item-label">Código de Barras</div>
+                </div>
+                <div class="toolbox-item" draggable="true" data-element-type="qrcode">
+                    <div class="toolbox-item-icon">▦</div>
+                    <div class="toolbox-item-label">QR Code</div>
+                </div>
+            </div>
+            
+            <div class="toolbox-category">
+                <div class="category-title">Agregações</div>
+                <div class="toolbox-item" draggable="true" data-element-type="aggregate">
+                    <div class="toolbox-item-icon">Σ</div>
+                    <div class="toolbox-item-label">Soma/Contagem</div>
+                </div>
+            </div>
+
+            <div class="toolbox-category">
+                <div class="category-title">Avançado</div>
+                <div class="toolbox-item" draggable="true" data-element-type="checkbox">
+                    <div class="toolbox-item-icon">☑</div>
+                    <div class="toolbox-item-label">Caixa de Seleção</div>
+                </div>
+                <div class="toolbox-item" draggable="true" data-element-type="richtext">
+                    <div class="toolbox-item-icon">📃</div>
+                    <div class="toolbox-item-label">Texto Rico</div>
+                </div>
+                <div class="toolbox-item" draggable="true" data-element-type="datatable">
+                    <div class="toolbox-item-icon">📋</div>
+                    <div class="toolbox-item-label">Tabela de Dados</div>
+                </div>
+                <div class="toolbox-item" draggable="true" data-element-type="chart">
+                    <div class="toolbox-item-icon">📈</div>
+                    <div class="toolbox-item-label">Gráfico</div>
+                </div>
+                <div class="toolbox-item" draggable="true" data-element-type="datefield">
+                    <div class="toolbox-item-icon">📅</div>
+                    <div class="toolbox-item-label">Campo de Data</div>
+                </div>
+                <div class="toolbox-item" draggable="true" data-element-type="numericfield">
+                    <div class="toolbox-item-icon">🔢</div>
+                    <div class="toolbox-item-label">Campo Numérico</div>
+                </div>
+                <div class="toolbox-item" draggable="true" data-element-type="subreport">
+                    <div class="toolbox-item-icon">📄</div>
+                    <div class="toolbox-item-label">Sub-relatório</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Center - Designer Canvas -->
+    <div class="center-area">
+        <div class="canvas-toolbar">
+            <label>Página:</label>
+            <select id="pageSize" class="property-input" style="width: auto;">
+                {% for value, label in page_sizes %}
+                    <option value="{{ value }}" {% if layout and layout.page_size == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            
+            <label>Orientação:</label>
+            <select id="orientation" class="property-input" style="width: auto;">
+                {% for value, label in orientations %}
+                    <option value="{{ value }}" {% if layout and layout.orientation == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            
+            <div class="toolbar-separator"></div>
+            
+            <label>Zoom:</label>
+            <select id="zoomLevel" class="property-input" style="width: auto;">
+                <option value="0.5">50%</option>
+                <option value="0.75">75%</option>
+                <option value="1" selected>100%</option>
+                <option value="1.25">125%</option>
+                <option value="1.5">150%</option>
+                <option value="2">200%</option>
+            </select>
+            
+            <div class="toolbar-separator"></div>
+            
+            <label>
+                <input type="checkbox" id="showGrid" checked> Mostrar Grade
+            </label>
+            
+            <label style="margin-left: 16px;">
+                <input type="checkbox" id="snapToGrid" checked> Ajustar à Grade
+            </label>
+
+            <div class="toolbar-separator"></div>
+            <label style="font-size:11px;">Alinhar:</label>
+            <button class="toolbar-btn" style="padding:4px 7px;" id="btnAlignLeft" title="Alinhar à Esquerda" onclick="alignElements('left')">⬤←</button>
+            <button class="toolbar-btn" style="padding:4px 7px;" id="btnAlignHCenter" title="Centralizar Horizontal" onclick="alignElements('hcenter')">↔⬤</button>
+            <button class="toolbar-btn" style="padding:4px 7px;" id="btnAlignRight" title="Alinhar à Direita" onclick="alignElements('right')">→⬤</button>
+            <button class="toolbar-btn" style="padding:4px 7px;" id="btnAlignTop" title="Alinhar ao Topo" onclick="alignElements('top')">⬤↑</button>
+            <button class="toolbar-btn" style="padding:4px 7px;" id="btnAlignVCenter" title="Centralizar Vertical" onclick="alignElements('vcenter')">↕⬤</button>
+            <button class="toolbar-btn" style="padding:4px 7px;" id="btnAlignBottom" title="Alinhar à Base" onclick="alignElements('bottom')">↓⬤</button>
+            <button class="toolbar-btn" style="padding:4px 7px; margin-left:4px;" id="btnDistH" title="Distribuir Horizontalmente" onclick="distributeElements('horizontal')">|⬤|⬤|</button>
+            <button class="toolbar-btn" style="padding:4px 7px;" id="btnDistV" title="Distribuir Verticalmente" onclick="distributeElements('vertical')">—⬤—</button>
+        </div>
+        
+        <div class="canvas-container" id="canvasContainer">
+            <div class="canvas-page" id="canvasPage">
+                <!-- Bands will be rendered here by JavaScript -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- Right Sidebar - Properties & Fields -->
+    <div class="right-sidebar">
+        <div class="sidebar-tabs">
+            <div class="sidebar-tab active" data-tab="properties">⚙️ Propriedades</div>
+            <div class="sidebar-tab" data-tab="fields">📊 Campos</div>
+            <div class="sidebar-tab" data-tab="bands">📑 Bandas</div>
+        </div>
+        
+        <!-- Properties Tab -->
+        <div class="sidebar-content" id="propertiesTab">
+            <div id="propertiesApplyBar" style="display:none; position:sticky; top:0; z-index:10; background:#1e1e2e; padding:6px 8px; border-bottom:1px solid #3a3a4a;">
+                <button id="btnApplyProperties" onclick="applyElementProperties()"
+                    style="width:100%; padding:7px; background:#0e639c; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px; font-weight:600;">
+                    💾 Aplicar Alterações
+                </button>
+            </div>
+            <div id="propertiesContent">
+                <div style="text-align: center; padding: 40px 20px; color: #969696;">
+                    <div style="font-size: 48px; margin-bottom: 12px;">⚙️</div>
+                    <div>Selecione um elemento para ver as propriedades</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Fields Tab -->
+        <div class="sidebar-content hidden" id="fieldsTab">
+            <div style="margin-bottom: 16px;">
+                <label class="form-label">Query de Dados:</label>
+                <select id="querySelect" class="property-input">
+                    <option value="">Nenhuma</option>
+                    {% for query in queries %}
+                        <option value="{{ query.id }}" {% if query_ativa and query_ativa.id == query.id %}selected{% endif %}>
+                            {{ query.nome_query }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div style="margin-bottom: 16px;">
+                <input type="text" id="fieldsSearch" class="property-input" placeholder="🔍 Buscar campos...">
+            </div>
+            
+            <div class="fields-list" id="fieldsList">
+                <!-- Fields will be populated by JavaScript -->
+            </div>
+        </div>
+        
+        <!-- Bands Tab -->
+        <div class="sidebar-content hidden" id="bandsTab">
+            <div style="margin-bottom:10px; display:flex; gap:6px; flex-wrap:wrap;">
+                <button class="toolbar-btn" style="flex:1; justify-content:center; font-size:11px;" onclick="addGroupBand()">+ Grupo</button>
+                <button class="toolbar-btn" style="flex:1; justify-content:center; font-size:11px;" onclick="addBand('header')">+ Cabeç.</button>
+                <button class="toolbar-btn" style="flex:1; justify-content:center; font-size:11px;" onclick="addBand('footer')">+ Rodapé</button>
+            </div>
+            <div class="bands-list" id="bandsList">
+                <!-- Bands will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Save/Save As Modal -->
+<div class="modal" id="saveModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title" id="saveModalTitle">💾 Salvar Layout</h3>
+            <button class="modal-close" onclick="closeSaveModal()">×</button>
+        </div>
+        <div class="modal-body">
+            {% csrf_token %}
+            <div class="form-group">
+                <label class="form-label">Nome do Layout *</label>
+                <input type="text" id="layoutName" class="form-input" placeholder="Ex: Relatório de Entregas" value="{% if layout %}{{ layout.nome }}{% endif %}" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Descrição</label>
+                <textarea id="layoutDescription" class="form-input" rows="3" placeholder="Descrição opcional do layout">{% if layout %}{{ layout.descricao }}{% endif %}</textarea>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="layoutPadrao" {% if layout and layout.padrao %}checked{% endif %}> Usar como layout padrão
+                </label>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="toolbar-btn" onclick="closeSaveModal()">Cancelar</button>
+            <button class="toolbar-btn primary" onclick="saveLayout()">💾 Salvar</button>
+        </div>
+    </div>
+</div>
+
+<!-- PDF Preview Modal -->
+<div class="pdf-preview-modal" id="pdfPreviewModal">
+    <div class="pdf-preview-content">
+        <div class="pdf-preview-header">
+            <h3 class="pdf-preview-title">📄 Preview do Relatório</h3>
+            <div class="pdf-preview-actions">
+                <button class="toolbar-btn" id="openInNewTab" title="Abrir em Nova Aba">
+                    🔗 Nova Aba
+                </button>
+                <button class="toolbar-btn" id="downloadPdf" title="Baixar PDF">
+                    💾 Baixar
+                </button>
+                <button class="modal-close" onclick="closePdfPreview()">×</button>
+            </div>
+        </div>
+        <div class="pdf-preview-body">
+            <div class="pdf-loading" id="pdfLoading">⏳ Carregando preview...</div>
+            <iframe class="pdf-preview-frame" id="pdfPreviewFrame" style="display:none;"></iframe>
+        </div>
+    </div>
+</div>
+
+<script>
+// Global State
+let layoutData = {};
+let camposDisponiveis = [];
+let selectedElement = null;
+let selectedBand = null;
+let selectedElements = []; // Multi-select (Shift+Click)
+let isDragging = false;
+let isResizing = false;
+let dragStartX = 0;
+let dragStartY = 0;
+let undoStack = [];
+let redoStack = [];
+let elementIdCounter = 1;
+let clipboard = null;
+let currentLayoutId = {% if layout %}"{{ layout.id }}"{% else %}null{% endif %};
+let currentQueryId = {% if query_ativa %}"{{ query_ativa.id }}"{% else %}null{% endif %};
+let zoomLevel = 1;
+let showGrid = true;
+let snapToGrid = true;
+
+// Page sizes in mm
+const PAGE_SIZES = {
+    'A4': { width: 210, height: 297 },
+    'Letter': { width: 215.9, height: 279.4 },
+    'Legal': { width: 215.9, height: 355.6 },
+    'A3': { width: 297, height: 420 },
+    'A5': { width: 148, height: 210 }
+};
+
+// Parse data from Django template
+try {
+    layoutData = JSON.parse('{{ layout_json|escapejs }}');
+} catch(e) {
+    console.warn('Could not parse layout_json, using empty object');
+    layoutData = {};
+}
+
+try {
+    camposDisponiveis = JSON.parse('{{ campos_disponiveis|escapejs }}');
+} catch(e) {
+    console.warn('Could not parse campos_disponiveis, using empty array');
+    camposDisponiveis = [];
+}
+
+console.log('Parsed layoutData:', layoutData);
+console.log('Parsed camposDisponiveis:', camposDisponiveis?.length, 'campos');
+
+function initializeLayout() {
+    console.log('initializeLayout called');
+    
+    // Verifica se layoutData é um objeto vazio ou não tem bands
+    if (!layoutData || typeof layoutData !== 'object' || !layoutData.bands || layoutData.bands.length === 0) {
+        console.log('Creating default bands structure...');
+        layoutData = {
+            bands: [
+                {
+                    id: 'page_header',
+                    type: 'page_header',
+                    name: 'Cabeçalho de Página',
+                    height: 80,
+                    visible: true,
+                    print_on_first_page: true,
+                    background_color: '',
+                    elements: []
+                },
+                {
+                    id: 'header',
+                    type: 'header',
+                    name: 'Cabeçalho',
+                    height: 60,
+                    visible: true,
+                    background_color: '',
+                    elements: []
+                },
+                {
+                    id: 'detail',
+                    type: 'detail',
+                    name: 'Detalhe',
+                    height: 30,
+                    visible: true,
+                    alternating_color: true,
+                    background_color: '#ffffff',
+                    alternate_color: '#f9f9f9',
+                    elements: []
+                },
+                {
+                    id: 'footer',
+                    type: 'footer',
+                    name: 'Rodapé',
+                    height: 40,
+                    visible: true,
+                    background_color: '',
+                    elements: []
+                },
+                {
+                    id: 'page_footer',
+                    type: 'page_footer',
+                    name: 'Rodapé de Página',
+                    height: 60,
+                    visible: true,
+                    print_on_last_page: true,
+                    background_color: '',
+                    elements: []
+                }
+            ],
+            variables: [],
+            expressions: []
+        };
+        console.log('Default bands created:', layoutData.bands.length, 'bands');
+    } else {
+        console.log('Using existing layout with', layoutData.bands.length, 'bands');
+    }
+}
+
+// Continua no próximo arquivo...
+</script>
+
+<script src="{% static 'js/report-designer.js' %}?v=20260221M"></script>
+
+<script>
+// Inicialização após TODOS os scripts carregarem
+(function() {
+    console.log('=== INICIALIZANDO REPORT DESIGNER ===');
+    
+    // 1. Inicializa layout (cria bandas padrão se necessário)
+    initializeLayout();
+    console.log('Layout inicializado. Bandas:', layoutData.bands?.length);
+    
+    // 2. Configura eventos
+    if (typeof setupEventListeners === 'function') {
+        setupEventListeners();
+        console.log('Event listeners configurados');
+    } else {
+        console.error('setupEventListeners NÃO ENCONTRADA! report-designer.js pode estar cacheado.');
+    }
+    
+    // 3. Renderiza canvas com as bandas
+    if (typeof renderCanvas === 'function') {
+        renderCanvas();
+        console.log('Canvas renderizado');
+    } else {
+        console.error('renderCanvas NÃO ENCONTRADA!');
+    }
+    
+    // 4. Renderiza lista de campos
+    if (typeof renderFieldsList === 'function') {
+        renderFieldsList();
+        console.log('Fields list renderizada');
+    } else {
+        console.error('renderFieldsList NÃO ENCONTRADA!');
+    }
+    
+    // 5. Renderiza lista de bandas
+    if (typeof renderBandsList === 'function') {
+        renderBandsList();
+        console.log('Bands list renderizada');
+    } else {
+        console.error('renderBandsList NÃO ENCONTRADA!');
+    }
+    
+    // 6. Atualiza tamanho da página
+    if (typeof updatePageSize === 'function') {
+        updatePageSize();
+        console.log('Page size atualizado');
+    } else {
+        console.error('updatePageSize NÃO ENCONTRADA!');
+    }
+    
+    console.log('=== REPORT DESIGNER PRONTO ===');
+})();
+</script>
+
+</body>
+</html>

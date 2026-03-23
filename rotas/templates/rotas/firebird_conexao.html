@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Conexão Firebird</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .card { box-shadow: 0 2px 4px rgba(0,0,0,.1); }
+        .btn-success { background-color: #28a745; }
+        .btn-success:hover { background-color: #218838; }
+        .status-badge { font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">Fermap Logística</a>
+            <span class="navbar-text text-white">{{ user.username }}</span>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-8 offset-md-2">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Configurar Conexão Firebird</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if messages %}
+                            {% for message in messages %}
+                                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+
+                        <div class="alert alert-info alert-dismissible fade show" role="alert">
+                            <strong>ℹ️ Importante:</strong> Para conectar ao Firebird, você precisa ter o <strong>cliente Firebird (fbclient.dll)</strong> instalado no seu computador.
+                            <br><small>Se receber erro "WinError 193", <a href="https://firebirdsql.org/en/firebird-3-0/" target="_blank" class="alert-link">clique aqui para baixar</a> a versão correta (64-bit ou 32-bit conforme seu Python).</small>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+
+                        <form method="post">
+                            {% csrf_token %}
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Nome da Conexão</label>
+                                {{ formulario.nome_conexao }}
+                                {% if formulario.nome_conexao.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ formulario.nome_conexao.errors }}
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <div class="mb-3">
+                                        <label class="form-label">Host/Servidor</label>
+                                        {{ formulario.host }}
+                                        <small class="form-text text-muted">Ex: 192.168.1.100 ou localhost</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label">Porta</label>
+                                        {{ formulario.porta }}
+                                        <small class="form-text text-muted">Padrão: 3050</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Caminho do Banco</label>
+                                {{ formulario.caminho_banco }}
+                                <small class="form-text text-muted">Ex: C:\Firebird\database.fdb</small>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Usuário Firebird</label>
+                                        {{ formulario.usuario_banco }}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Senha Firebird</label>
+                                        {{ formulario.senha_banco }}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Charset</label>
+                                        {{ formulario.charset }}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check mt-4">
+                                        {{ formulario.ativo }}
+                                        <label class="form-check-label">
+                                            Ativo
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-check mt-2">
+                                        {{ formulario.importacao_automatica }}
+                                        <label class="form-check-label">Habilitar importação automática</label>
+                                        <small class="form-text text-muted d-block">Executa a importação em segundo plano na tela inicial.</small>
+                                        {% if formulario.importacao_automatica.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {{ formulario.importacao_automatica.errors }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Intervalo da importação (segundos)</label>
+                                        {{ formulario.importacao_intervalo_segundos }}
+                                        <small class="form-text text-muted">Mín: 30s • Máx: 21600s (6h)</small>
+                                        {% if formulario.importacao_intervalo_segundos.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {{ formulario.importacao_intervalo_segundos.errors }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-between mt-4">
+                                <div style="display:flex; gap:8px;">
+                                    <button type="button" class="btn btn-warning" id="test-btn">
+                                        <i class="fas fa-plug"></i> Testar Conexão
+                                    </button>
+                                    <a href="{% url 'rotas:editor_sql_page' %}" class="btn btn-secondary">
+                                        📝 Editor SQL
+                                    </a>
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save"></i> Salvar Configuração
+                                </button>
+                            </div>
+                        </form>
+
+                        {% if conexao_testada %}
+                            <div class="alert alert-success mt-3">
+                                ✅ Conexão testada com sucesso!
+                            </div>
+                        {% endif %}
+
+                        <hr class="my-4">
+
+                        <div class="mt-4">
+                            <h6>Próximas Etapas:</h6>
+                            <ol>
+                                <li>Acesse o painel principal e edite o SQL em "SQL + Card"</li>
+                                <li>Teste o SQL para validar os dados</li>
+                                <li><a href="{% url 'rotas:importar_pedidos' %}">Importe os pedidos</a></li>
+                                <li>Converta pedidos em paradas no mapa</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.getElementById('test-btn').addEventListener('click', function() {
+            // Pega os dados do formulário
+            const formData = {
+                host: document.querySelector('[name="host"]').value,
+                porta: document.querySelector('[name="porta"]').value,
+                caminho_banco: document.querySelector('[name="caminho_banco"]').value,
+                usuario_banco: document.querySelector('[name="usuario_banco"]').value,
+                senha_banco: document.querySelector('[name="senha_banco"]').value,
+                charset: document.querySelector('[name="charset"]').value
+            };
+            
+            // Valida campos obrigatórios
+            if (!formData.host || !formData.caminho_banco || !formData.usuario_banco || !formData.senha_banco) {
+                alert('❌ Por favor, preencha todos os campos obrigatórios!');
+                return;
+            }
+            
+            fetch('{% url "rotas:test_conexao_firebird" %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✅ ' + data.message);
+                    location.reload();
+                } else {
+                    alert('❌ ' + data.message);
+                }
+            })
+            .catch(error => alert('Erro ao testar conexão: ' + error));
+        });
+
+        const chkAutoImport = document.querySelector('[name="importacao_automatica"]');
+        const inputIntervalo = document.querySelector('[name="importacao_intervalo_segundos"]');
+
+        function syncAutoImportFields() {
+            if (!inputIntervalo) return;
+            const enabled = chkAutoImport ? chkAutoImport.checked : false;
+            inputIntervalo.readOnly = !enabled;
+            inputIntervalo.required = enabled;
+            inputIntervalo.classList.toggle('bg-light', !enabled);
+        }
+
+        if (chkAutoImport) {
+            syncAutoImportFields();
+            chkAutoImport.addEventListener('change', syncAutoImportFields);
+        }
+    </script>
+</body>
+</html>

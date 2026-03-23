@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Editor SQL – Fermap Logística</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        html, body {
+            height: 100%; margin: 0; padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f1f5f9; display: flex; flex-direction: column;
+        }
+        .top-bar {
+            height: 48px; flex-shrink: 0;
+            background: #1e293b; color: #fff;
+            padding: 0 18px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .top-bar .brand { font-weight: 700; font-size: 15px; color: #fff; text-decoration: none; }
+        .top-bar .top-actions { display: flex; gap: 8px; align-items: center; }
+        .btn-nav {
+            background: rgba(255,255,255,.13);
+            border: 1px solid rgba(255,255,255,.28);
+            color: #fff; border-radius: 6px; padding: 4px 12px; font-size: 12px;
+            text-decoration: none; display: inline-flex; align-items: center; gap: 5px;
+        }
+        .btn-nav:hover { background: rgba(255,255,255,.22); color: #fff; text-decoration: none; }
+        .page-body { flex: 1; display: flex; overflow: hidden; }
+        /* ── Sidebar ── */
+        .sidebar {
+            width: 230px; flex-shrink: 0;
+            background: #fff; border-right: 1px solid #e2e8f0;
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+        .sidebar-head { padding: 12px 14px 8px; border-bottom: 1px solid #e2e8f0; flex-shrink: 0; }
+        .sidebar-head span { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #94a3b8; }
+        .btn-add-sql {
+            display: flex; align-items: center; justify-content: center; gap: 5px;
+            width: 100%; margin-top: 8px;
+            background: #1e293b; color: #fff; border: none; border-radius: 7px;
+            padding: 7px 10px; font-size: 12px; font-weight: 600; cursor: pointer;
+        }
+        .btn-add-sql:hover { background: #334155; }
+        .sidebar-list { flex: 1; overflow-y: auto; padding: 6px 0; }
+        .sql-row {
+            display: flex; align-items: center; padding: 9px 12px; cursor: pointer;
+            border-left: 3px solid transparent; gap: 9px; transition: background .12s;
+        }
+        .sql-row:hover { background: #f8fafc; }
+        .sql-row.active { background: #eff6ff; border-left-color: #3b82f6; }
+        .sql-num {
+            width: 32px; height: 32px; flex-shrink: 0;
+            background: #f1f5f9; border-radius: 6px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 11px; font-weight: 700; color: #475569;
+        }
+        .sql-row.active .sql-num  { background: #dbeafe; color: #1d4ed8; }
+        .sql-row.principal .sql-num { background: #d1fae5; color: #065f46; }
+        .sql-info { flex: 1; min-width: 0; }
+        .sql-name { font-size: 13px; font-weight: 600; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sql-sub  { font-size: 10.5px; color: #94a3b8; margin-top: 1px; }
+        /* ── Editor area ── */
+        .editor-area {
+            flex: 1; display: flex; flex-direction: column;
+            overflow: hidden; padding: 14px 16px; gap: 10px;
+        }
+        .area-header { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+        .area-header h5 { margin: 0; font-size: 15px; font-weight: 700; color: #1e293b; }
+        .area-header .meta { font-size: 12px; color: #64748b; margin-top: 2px; }
+        /* ── Meta form (extras) ── */
+        .meta-form {
+            background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
+            padding: 12px 14px; display: flex; flex-wrap: wrap; gap: 10px 16px; flex-shrink: 0;
+        }
+        .meta-form .mf { display: flex; flex-direction: column; gap: 3px; }
+        .meta-form label { font-size: 11px; font-weight: 700; color: #64748b; }
+        .meta-form input, .meta-form select {
+            border: 1px solid #cbd5e1; border-radius: 6px;
+            padding: 5px 9px; font-size: 12.5px; color: #1e293b;
+            background: #fff; outline: none; font-family: inherit;
+        }
+        .meta-form input:focus, .meta-form select:focus {
+            border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,.1);
+        }
+        .mf-nome { flex: 1 1 200px; } .mf-tipo { flex: 0 0 170px; }
+        .mf-join { flex: 1 1 160px; } .mf-descr { flex: 1 1 100%; }
+        /* ── Join pairs ── */
+        .mf-joins { flex: 1 1 100%; }
+        .join-pairs-label { font-size: 11px; font-weight: 700; color: #64748b; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+        .join-pairs-list { display: flex; flex-direction: column; gap: 5px; }
+        .join-pair-row { display: flex; align-items: center; gap: 6px; }
+        .join-pair-row select, .join-pair-row input {
+            border: 1px solid #cbd5e1; border-radius: 6px;
+            padding: 5px 9px; font-size: 12.5px; color: #1e293b;
+            background: #fff; outline: none; font-family: inherit; flex: 1;
+        }
+        .join-pair-row select:focus, .join-pair-row input:focus {
+            border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,.1);
+        }
+        .join-pair-row .jp-arrow { color: #94a3b8; font-size: 14px; flex-shrink: 0; }
+        .btn-jp-remove { background: #fee2e2; color: #dc2626; border: none; border-radius: 5px; width: 26px; height: 26px; font-size: 14px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+        .btn-jp-remove:hover { background: #fecaca; }
+        .btn-jp-add { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer; }
+        .btn-jp-add:hover { background: #dbeafe; }
+        .jp-empty { font-size: 12px; color: #94a3b8; font-style: italic; }
+        /* ── Split ── */
+        .split-pane { flex: 1; display: flex; gap: 12px; overflow: hidden; }
+        .pane-editor { width: 44%; min-width: 280px; flex-shrink: 0; display: flex; flex-direction: column; gap: 10px; }
+        .editor-card {
+            flex: 1; background: #fff; border: 1px solid #e2e8f0;
+            border-radius: 10px; display: flex; flex-direction: column; overflow: hidden;
+        }
+        .editor-card-head {
+            padding: 9px 13px; border-bottom: 1px solid #e2e8f0;
+            background: #f8fafc; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+        }
+        .editor-card-head strong { font-size: 12px; color: #475569; font-weight: 700; }
+        .editor-card-head small  { font-size: 11px; color: #94a3b8; }
+        #sqlTextarea {
+            flex: 1; border: none; outline: none; resize: none;
+            padding: 12px 14px;
+            font-family: 'Cascadia Code','Fira Code',Consolas,monospace;
+            font-size: 13px; line-height: 1.6; color: #e2e8f0;
+            background: #1a1f2e; min-height: 0;
+        }
+        .editor-foot {
+            padding: 8px 12px; border-top: 1px solid #e2e8f0;
+            background: #f8fafc; display: flex; align-items: center; justify-content: space-between;
+            flex-shrink: 0; gap: 8px;
+        }
+        #sqlStatus { font-size: 11px; color: #94a3b8; }
+        .btn-test { background: #0ea5e9; color: #fff; border: none; border-radius: 6px; padding: 6px 16px; font-size: 12px; font-weight: 600; cursor: pointer; }
+        .btn-test:hover { background: #0284c7; } .btn-test:disabled { opacity: .6; cursor: default; }
+        .btn-save { background: #10b981; color: #fff; border: none; border-radius: 6px; padding: 6px 16px; font-size: 12px; font-weight: 600; cursor: pointer; }
+        .btn-save:hover { background: #059669; } .btn-save:disabled { opacity: .6; cursor: default; }
+        .btn-del  { background: #fee2e2; color: #dc2626; border: none; border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
+        .btn-del:hover { background: #fecaca; }
+        /* aliases */
+        .aliases-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; flex-shrink: 0; }
+        .aliases-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #64748b; margin-bottom: 7px; }
+        .aliases-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+        .alias-tag { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 500; font-family: monospace; }
+        .aliases-empty { font-size: 12px; color: #94a3b8; font-style: italic; }
+        /* preview */
+        .pane-preview { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+        .preview-card { flex: 1; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; display: flex; flex-direction: column; overflow: hidden; }
+        .preview-card-head { padding: 9px 13px; border-bottom: 1px solid #e2e8f0; background: #f8fafc; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+        .preview-card-head strong { font-size: 12px; color: #475569; font-weight: 700; }
+        #previewMeta { font-size: 12px; color: #64748b; padding: 6px 13px; border-bottom: 1px solid #f1f5f9; display: none; flex-shrink: 0; }
+        #previewEmpty { flex: 1; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 13px; padding: 20px; text-align: center; }
+        #previewTableWrap { flex: 1; overflow: auto; display: none; }
+        #previewTable { width: 100%; border-collapse: collapse; font-size: 12px; }
+        #previewTable th { background: #f1f5f9; color: #475569; font-weight: 600; padding: 7px 11px; border-bottom: 2px solid #e2e8f0; white-space: nowrap; position: sticky; top: 0; z-index: 1; }
+        #previewTable td { padding: 6px 11px; border-bottom: 1px solid #f1f5f9; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #1e293b; }
+        #previewTable tr:hover td { background: #f8fafc; }
+        /* toast */
+        .toast-wrap { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 6px; }
+        .t-msg { background: #1e293b; color: #fff; border-radius: 8px; padding: 9px 16px; font-size: 13px; font-weight: 500; box-shadow: 0 4px 16px rgba(0,0,0,.18); animation: tIn .2s ease; max-width: 340px; }
+        .t-msg.ok  { background: #059669; }
+        .t-msg.err { background: #dc2626; }
+        @keyframes tIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+{% csrf_token %}
+
+<div class="top-bar">
+    <a href="/" class="brand">⚡ Fermap Logística</a>
+    <div class="top-actions">
+        <span style="font-size:12px;color:#94a3b8">{{ user.username }}</span>
+        <a href="{% url 'rotas:conexao_firebird' %}" class="btn-nav">← Conexão</a>
+        <a href="{% url 'rotas:index' %}" class="btn-nav">🗺️ Painel</a>
+    </div>
+</div>
+
+<div class="page-body">
+
+    <!-- ── Sidebar ── -->
+    <div class="sidebar">
+        <div class="sidebar-head">
+            <span>Queries SQL</span>
+            <button class="btn-add-sql" id="btnAddSql">＋ Novo SQL</button>
+        </div>
+        <div class="sidebar-list" id="sidebarList">
+
+            <div class="sql-row principal active" data-id="principal" onclick="selectItem(this,'principal')">
+                <div class="sql-num">01</div>
+                <div class="sql-info">
+                    <div class="sql-name">SQL Principal</div>
+                    <div class="sql-sub">Pedidos &amp; rotas</div>
+                </div>
+            </div>
+
+            {% for s in sqls_extra %}
+            <div class="sql-row" data-id="{{ s.id }}" onclick="selectItem(this,'extra',{{ s.id }})">
+                <div class="sql-num">{{ forloop.counter|add:1|stringformat:"02d" }}</div>
+                <div class="sql-info">
+                    <div class="sql-name">{{ s.nome }}</div>
+                    <div class="sql-sub">{{ s.tipo }}</div>
+                </div>
+            </div>
+            {% endfor %}
+
+        </div>
+    </div>
+
+    <!-- ── Editor area ── -->
+    <div class="editor-area">
+
+        <div class="area-header">
+            <div>
+                <h5 id="areaTitle">SQL 01 – Principal (Pedidos &amp; Rotas)</h5>
+                <div class="meta" id="areaMeta">Edite o SELECT que importa pedidos do Firebird. Os aliases viram campos do card.</div>
+            </div>
+            <button class="btn-del" id="btnDel" style="display:none" onclick="deletarExtra()">🗑 Excluir este SQL</button>
+        </div>
+
+        <div class="meta-form" id="metaForm" style="display:none;">
+            <div class="mf mf-nome">
+                <label>Nome *</label>
+                <input type="text" id="mfNome" maxlength="255" placeholder="Ex: Produtos do Pedido">
+            </div>
+            <div class="mf mf-tipo">
+                <label>Tipo *</label>
+                <select id="mfTipo">
+                    {% for val, lbl in tipos_extra %}
+                    <option value="{{ val }}">{{ lbl }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="mf mf-joins">
+                <div class="join-pairs-label">
+                    <span>Parâmetros SQL ↔ Campos do pedido</span>
+                    <button type="button" class="btn-jp-add" id="btnJoinDetect">🔍 Detectar parâmetros</button>
+                    <button type="button" class="btn-jp-add" id="btnJoinAdd" style="margin-left:4px">＋ Manual</button>
+                </div>
+                <div class="join-pairs-list" id="joinPairsList">
+                    <div class="jp-empty" id="joinPairsEmpty">Nenhum parâmetro configurado — use <b>:nome</b> no SQL e clique em "Detectar parâmetros".</div>
+                </div>
+            </div>
+            <div class="mf mf-descr">
+                <label>Descrição (opcional)</label>
+                <input type="text" id="mfDescr" maxlength="300" placeholder="Para que serve este SQL?">
+            </div>
+        </div>
+
+        <div class="split-pane">
+
+            <div class="pane-editor">
+                <div class="editor-card">
+                    <div class="editor-card-head">
+                        <strong>✏️ SQL</strong>
+                        <small>Ctrl+Enter = Testar &nbsp;|&nbsp; Ctrl+S = Salvar</small>
+                    </div>
+                    <textarea id="sqlTextarea" spellcheck="false" autocomplete="off"
+                        placeholder="-- Cole aqui o SELECT&#10;SELECT ...">{{ sql_ativo }}</textarea>
+                    <div class="editor-foot">
+                        <span id="sqlStatus">—</span>
+                        <div style="display:flex;gap:7px">
+                            <button class="btn-test" id="btnTest" onclick="testar()">🔍 Testar</button>
+                            <button class="btn-save" id="btnSave" onclick="salvar()">💾 Salvar</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="aliases-card">
+                    <div class="aliases-label">Colunas / Aliases detectados</div>
+                    <div class="aliases-tags" id="aliasesTags">
+                        {% if campos_sql %}
+                            {% for c in campos_sql %}<span class="alias-tag">{{ c }}</span>{% endfor %}
+                        {% else %}
+                            <span class="aliases-empty">Teste ou salve o SQL para detectar as colunas.</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="pane-preview">
+                <div class="preview-card">
+                    <div class="preview-card-head">
+                        <strong>📊 Preview <span style="font-weight:400;color:#94a3b8">(até 10 linhas)</span></strong>
+                        <span id="previewBadge" style="font-size:11px;color:#64748b"></span>
+                    </div>
+                    <div id="previewMeta"></div>
+                    <div id="previewEmpty">Execute "🔍 Testar" para ver os dados retornados.</div>
+                    <div id="previewTableWrap">
+                        <table id="previewTable">
+                            <thead id="previewHead"></thead>
+                            <tbody id="previewBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Modal: valores de parâmetros para teste -->
+<div id="testParamsOverlay" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9000;align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:12px;padding:28px 32px;min-width:360px;max-width:520px;width:90vw;box-shadow:0 8px 32px rgba(0,0,0,.22);">
+        <h3 style="margin:0 0 6px;font-size:16px;color:#1e293b">🔢 Valores dos parâmetros</h3>
+        <p style="margin:0 0 18px;font-size:13px;color:#64748b">Informe os valores que serão substituídos no teste.</p>
+        <div id="testParamsList" style="display:flex;flex-direction:column;gap:10px;"></div>
+        <div style="display:flex;gap:10px;margin-top:22px;justify-content:flex-end">
+            <button id="testParamsCancelBtn" style="padding:7px 18px;border:1px solid #cbd5e1;border-radius:7px;background:#fff;color:#475569;cursor:pointer;font-size:13px">Cancelar</button>
+            <button id="testParamsOkBtn" style="padding:7px 20px;border:none;border-radius:7px;background:#2563eb;color:#fff;cursor:pointer;font-size:13px;font-weight:600">▶ Executar teste</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script>
+const CSRF         = document.querySelector('[name=csrfmiddlewaretoken]').value;
+const URL_TESTAR_P = "{% url 'rotas:testar_sql_card_index' %}";
+const URL_SALVAR_P = "{% url 'rotas:salvar_sql_card_index' %}";
+const URL_TESTAR_E = "{% url 'rotas:sqls_extra_testar' %}";
+const URL_SALVAR_E = "{% url 'rotas:sqls_extra_salvar' %}";
+const URL_GET_E    = pk => `/firebird/sqls-extra/${pk}/`;
+const URL_DEL_E    = pk => `/firebird/sqls-extra/${pk}/deletar/`;
+
+const extrasMap = {};
+{% for s in sqls_extra %}
+extrasMap[{{ s.id }}] = { id: {{ s.id }}, nome: "{{ s.nome|escapejs }}", tipo: "{{ s.tipo }}", descricao: "{{ s.descricao|default:''|escapejs }}", sql: "", campo_join_pedido: "{{ s.campo_join_pedido|default:''|escapejs }}", campos_join: null };
+{% endfor %}
+
+let mode = 'principal', currentId = null;
+
+function toast(msg, type='') {
+    const wrap = document.getElementById('toastWrap');
+    const el = document.createElement('div');
+    el.className = 't-msg' + (type ? ' '+type : '');
+    el.textContent = msg;
+    wrap.appendChild(el);
+    setTimeout(()=>{ el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(()=>el.remove(),320); }, 3200);
+}
+function setStatus(msg, color='#94a3b8') {
+    const el = document.getElementById('sqlStatus');
+    el.textContent = msg; el.style.color = color;
+}
+function escH(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function getExtraNumber(id) {
+    const rows = [...document.querySelectorAll('.sql-row:not(.principal)')];
+    const idx = rows.findIndex(r => r.dataset.id == id);
+    return idx >= 0 ? String(idx+2).padStart(2,'0') : '??';
+}
+function renumberAll() {
+    document.querySelectorAll('.sql-row:not(.principal)').forEach((el,i)=>{
+        const n = el.querySelector('.sql-num');
+        if (n) n.textContent = String(i+2).padStart(2,'0');
+    });
+}
+
+function selectItem(el, tipo, id) {
+    document.querySelectorAll('.sql-row').forEach(r=>r.classList.remove('active'));
+    el.classList.add('active');
+    clearPreview();
+    if (tipo==='principal') { mode='principal'; currentId=null; loadPrincipal(); }
+    else { mode='extra'; currentId=id; loadExtra(id); }
+}
+
+function loadPrincipal() {
+    document.getElementById('areaTitle').textContent = 'SQL 01 – Principal (Pedidos & Rotas)';
+    document.getElementById('areaMeta').textContent  = 'Edite o SELECT que importa pedidos do Firebird. Os aliases viram campos do card.';
+    document.getElementById('metaForm').style.display = 'none';
+    document.getElementById('btnDel').style.display   = 'none';
+    document.getElementById('sqlTextarea').value = window._principalSQL;
+    renderAliases(window._principalCampos || []);
+    setStatus('—');
+}
+
+async function loadExtra(id) {
+    document.getElementById('areaTitle').textContent = 'SQL ' + getExtraNumber(id) + ' – Carregando…';
+    document.getElementById('metaForm').style.display = 'flex';
+    document.getElementById('btnDel').style.display   = '';
+    setStatus('—'); clearAliases();
+    let data = extrasMap[id];
+    if (!data || !data.sql) {
+        try {
+            const resp = await fetch(URL_GET_E(id));
+            const fresh = await resp.json();
+            extrasMap[id] = Object.assign({}, extrasMap[id]||{}, fresh);
+            data = extrasMap[id];
+        } catch(e) { toast('Erro ao carregar: '+e,'err'); return; }
+    }
+    applyExtra(id, data);
+}
+function applyExtra(id, data) {
+    document.getElementById('areaTitle').textContent = 'SQL ' + getExtraNumber(id) + ' – ' + data.nome;
+    document.getElementById('areaMeta').textContent  = data.descricao || 'SQL extra';
+    document.getElementById('mfNome').value  = data.nome  || '';
+    document.getElementById('mfTipo').value  = data.tipo  || 'personalizado';
+    document.getElementById('mfDescr').value = data.descricao || '';
+    document.getElementById('sqlTextarea').value = data.sql || '';
+    // Carregar campos de ligação
+    const cj = data.campos_join;
+    if (Array.isArray(cj) && cj.length > 0) {
+        setJoinPairs(cj);
+    } else if (data.campo_join_pedido) {
+        setJoinPairs([{coluna_sql: data.campo_join_pedido, campo_pedido: 'numero_pedido'}]);
+    } else {
+        setJoinPairs([]);
+    }
+    renderAliases(window._aliasCache[id] || []);
+}
+
+document.getElementById('btnAddSql').addEventListener('click', ()=>{
+    mode='new'; currentId=null;
+    document.querySelectorAll('.sql-row').forEach(r=>r.classList.remove('active'));
+    document.getElementById('areaTitle').textContent = 'Novo SQL';
+    document.getElementById('areaMeta').textContent  = 'Preencha os dados e clique em Salvar';
+    document.getElementById('metaForm').style.display = 'flex';
+    document.getElementById('btnDel').style.display   = 'none';
+    ['mfNome','mfDescr'].forEach(fid=>{ document.getElementById(fid).value=''; });
+    document.getElementById('mfTipo').value = 'personalizado';
+    setJoinPairs([]);
+    document.getElementById('sqlTextarea').value = '';
+    setStatus('—'); clearPreview(); clearAliases();
+    document.getElementById('mfNome').focus();
+});
+
+function _parseParamNames(sql) {
+    // Remove comentários de linha (-- ...) e de bloco (/* ... */) antes de procurar parâmetros
+    var stripped = sql
+        .replace(/--[^\r\n]*/g, ' ')           // comentários -­-
+        .replace(/\/\*[\s\S]*?\*\//g, ' ')      // comentários /* */
+        .replace(/'(?:[^'\\]|\\.)*'/g, "''");   // strings literais '...' → ''
+
+    var seen = {}, res = [], re = /:[a-zA-Z_][a-zA-Z0-9_]*/g, m;
+    while ((m = re.exec(stripped)) !== null) {
+        var n = m[0].slice(1);
+        if (!seen[n]) { seen[n] = true; res.push(n); }
+    }
+    return res;
+}
+
+// Armazena a promessa de resolução do modal
+let _testParamsResolve = null;
+
+function _openTestParamsModal(paramNames) {
+    return new Promise(function(resolve) {
+        _testParamsResolve = resolve;
+        const overlay = document.getElementById('testParamsOverlay');
+        const list = document.getElementById('testParamsList');
+        list.innerHTML = paramNames.map(function(p) {
+            return '<div style="display:flex;align-items:center;gap:10px">'+
+                '<label style="min-width:120px;font-size:13px;font-weight:600;color:#334155">:'+p+'</label>'+
+                '<input type="text" data-param="'+p+'" style="flex:1;padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px" placeholder="valor para :'+p+'">'+
+                '</div>';
+        }).join('');
+        overlay.style.display = 'flex';
+        // Foco no primeiro input
+        var first = list.querySelector('input');
+        if (first) setTimeout(function(){ first.focus(); }, 50);
+    });
+}
+
+document.getElementById('testParamsCancelBtn').addEventListener('click', function() {
+    document.getElementById('testParamsOverlay').style.display = 'none';
+    if (_testParamsResolve) { _testParamsResolve(null); _testParamsResolve = null; }
+});
+document.getElementById('testParamsOkBtn').addEventListener('click', function() {
+    var params = {};
+    document.querySelectorAll('#testParamsList input[data-param]').forEach(function(inp) {
+        params[inp.dataset.param] = inp.value;
+    });
+    document.getElementById('testParamsOverlay').style.display = 'none';
+    if (_testParamsResolve) { _testParamsResolve(params); _testParamsResolve = null; }
+});
+// Enter em qualquer input do modal confirma
+document.getElementById('testParamsList') && document.getElementById('testParamsList').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') document.getElementById('testParamsOkBtn').click();
+});
+// Escape cancela
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && document.getElementById('testParamsOverlay').style.display !== 'none') {
+        document.getElementById('testParamsCancelBtn').click();
+    }
+});
+
+async function testar() {
+    const sql = document.getElementById('sqlTextarea').value.trim();
+    if (!sql) { toast('Escreva o SQL antes de testar.','err'); return; }
+
+    // Detectar parâmetros nomeados
+    const paramNames = _parseParamNames(sql);
+    let paramsDict = {};
+    if (paramNames.length) {
+        const result = await _openTestParamsModal(paramNames);
+        if (result === null) return; // cancelado
+        paramsDict = result;
+    }
+
+    const btn = document.getElementById('btnTest');
+    btn.disabled=true; btn.textContent='⏳ Testando...';
+    setStatus('Executando…','#f59e0b'); clearPreview();
+    const url = (mode==='principal') ? URL_TESTAR_P : URL_TESTAR_E;
+    try {
+        const body = {sql};
+        if (paramNames.length) body.params = paramsDict;
+        const resp = await fetch(url, {
+            method:'POST',
+            headers:{'Content-Type':'application/json','X-CSRFToken':CSRF},
+            body: JSON.stringify(body)
+        });
+        const data = await resp.json();
+        if (data.success) {
+            const aliases = data.campos_sql_disponiveis || data.aliases || data.columns || [];
+            setStatus('✅ '+data.message+'  ('+data.execution_ms+'ms)','#059669');
+            renderPreview(data.columns||[], data.data||[]);
+            renderAliases(aliases);
+            if (currentId) window._aliasCache[currentId] = aliases;
+        } else {
+            setStatus('❌ '+(data.message||'Erro'),'#dc2626');
+            toast('❌ '+(data.message||'Erro ao testar'),'err');
+        }
+    } catch(e) { setStatus('❌ Erro de rede','#dc2626'); toast('Erro: '+e,'err'); }
+    btn.disabled=false; btn.textContent='🔍 Testar';
+}
+
+async function salvar() {
+    const sql = document.getElementById('sqlTextarea').value.trim();
+    if (!sql) { toast('Escreva o SQL antes de salvar.','err'); return; }
+    const btn = document.getElementById('btnSave');
+    btn.disabled=true; btn.textContent='⏳ Salvando...';
+
+    if (mode==='principal') {
+        try {
+            const resp = await fetch(URL_SALVAR_P, {
+                method:'POST',
+                headers:{'Content-Type':'application/json','X-CSRFToken':CSRF},
+                body: JSON.stringify({sql})
+            });
+            const data = await resp.json();
+            if (data.success) {
+                window._principalSQL    = sql;
+                window._principalCampos = data.campos_sql_disponiveis||[];
+                renderAliases(window._principalCampos);
+                toast('✅ '+data.message,'ok');
+            } else { toast('❌ '+(data.message||'Erro'),'err'); }
+        } catch(e) { toast('Erro: '+e,'err'); }
+        btn.disabled=false; btn.textContent='💾 Salvar'; return;
+    }
+
+    // Extra ou Novo
+    const nome  = document.getElementById('mfNome').value.trim();
+    const tipo  = document.getElementById('mfTipo').value;
+    const descr = document.getElementById('mfDescr').value.trim();
+    const camposJoin = getJoinPairs();
+    if (!nome) { toast('Informe um nome.','err'); document.getElementById('mfNome').focus(); btn.disabled=false; btn.textContent='💾 Salvar'; return; }
+    const payload = {nome, tipo, descricao:descr, sql, campos_join: camposJoin};
+    if (currentId) payload.id = currentId;
+    try {
+        const resp = await fetch(URL_SALVAR_E, {
+            method:'POST',
+            headers:{'Content-Type':'application/json','X-CSRFToken':CSRF},
+            body: JSON.stringify(payload)
+        });
+        const data = await resp.json();
+        if (data.success) {
+            const wasNew = !currentId;
+            currentId = data.id; mode='extra';
+            extrasMap[data.id] = {id:data.id, nome:data.nome, tipo:data.tipo, descricao:descr, sql, campos_join: camposJoin};
+            document.getElementById('areaTitle').textContent = 'SQL '+getExtraNumber(data.id)+' – '+data.nome;
+            document.getElementById('areaMeta').textContent  = descr || 'SQL extra';
+            document.getElementById('btnDel').style.display  = '';
+            if (wasNew) addSidebarItem(data.id, data.nome, data.tipo_display);
+            else        updateSidebarItem(data.id, data.nome, data.tipo_display);
+            toast('✅ '+data.message,'ok');
+        } else { toast('❌ '+(data.message||'Erro'),'err'); }
+    } catch(e) { toast('Erro: '+e,'err'); }
+    btn.disabled=false; btn.textContent='💾 Salvar';
+}
+
+async function deletarExtra() {
+    if (!currentId) return;
+    const nome = (extrasMap[currentId]||{}).nome || 'este SQL';
+    if (!confirm('Excluir "'+nome+'"? Esta ação não pode ser desfeita.')) return;
+    try {
+        const resp = await fetch(URL_DEL_E(currentId), {method:'POST', headers:{'X-CSRFToken':CSRF}});
+        const data = await resp.json();
+        if (data.success) {
+            toast('🗑 '+data.message,'ok');
+            removeSidebarItem(currentId);
+            delete extrasMap[currentId];
+            currentId=null; mode='principal';
+            document.querySelector('.sql-row.principal').click();
+        } else { toast('❌ '+(data.message||'Erro'),'err'); }
+    } catch(e) { toast('Erro: '+e,'err'); }
+}
+
+function addSidebarItem(id, nome, tipoDisplay) {
+    const list = document.getElementById('sidebarList');
+    const el = document.createElement('div');
+    el.className = 'sql-row active';
+    el.dataset.id = id;
+    el.onclick = ()=>selectItem(el,'extra',id);
+    list.appendChild(el);
+    renumberAll();
+    const num = getExtraNumber(id);
+    el.innerHTML = '<div class="sql-num">'+num+'</div><div class="sql-info"><div class="sql-name">'+escH(nome)+'</div><div class="sql-sub">'+escH(tipoDisplay)+'</div></div>';
+    document.querySelectorAll('.sql-row').forEach(r=>r.classList.remove('active'));
+    el.classList.add('active');
+}
+function updateSidebarItem(id, nome, tipoDisplay) {
+    const el = document.querySelector('.sql-row[data-id="'+id+'"]');
+    if (!el) return;
+    const num = getExtraNumber(id);
+    el.innerHTML = '<div class="sql-num">'+num+'</div><div class="sql-info"><div class="sql-name">'+escH(nome)+'</div><div class="sql-sub">'+escH(tipoDisplay)+'</div></div>';
+}
+function removeSidebarItem(id) {
+    const el = document.querySelector('.sql-row[data-id="'+id+'"]');
+    if (el) el.remove();
+    renumberAll();
+}
+
+function renderPreview(columns, rows) {
+    document.getElementById('previewBadge').textContent  = rows.length + ' linha(s)';
+    document.getElementById('previewMeta').textContent   = rows.length+' registro(s) · '+columns.length+' coluna(s)';
+    document.getElementById('previewMeta').style.display = 'block';
+    if (!columns.length) {
+        document.getElementById('previewEmpty').style.display='flex';
+        document.getElementById('previewTableWrap').style.display='none';
+        return;
+    }
+    document.getElementById('previewHead').innerHTML = '<tr>'+columns.map(c=>'<th>'+escH(c)+'</th>').join('')+'</tr>';
+    document.getElementById('previewBody').innerHTML = rows.map(row =>
+        '<tr>'+columns.map(c=>{
+            const v=row[c];
+            const txt = (v===null||v===undefined) ? '<span style="color:#94a3b8">NULL</span>' : escH(String(v));
+            return '<td>'+txt+'</td>';
+        }).join('')+'</tr>'
+    ).join('');
+    document.getElementById('previewEmpty').style.display='none';
+    document.getElementById('previewTableWrap').style.display='block';
+}
+function clearPreview() {
+    document.getElementById('previewBadge').textContent = '';
+    document.getElementById('previewMeta').style.display='none';
+    document.getElementById('previewEmpty').style.display='flex';
+    document.getElementById('previewEmpty').textContent='Execute "🔍 Testar" para ver os dados retornados.';
+    document.getElementById('previewTableWrap').style.display='none';
+    document.getElementById('previewHead').innerHTML='';
+    document.getElementById('previewBody').innerHTML='';
+}
+function renderAliases(aliases) {
+    const el = document.getElementById('aliasesTags');
+    if (!aliases||!aliases.length) {
+        el.innerHTML='<span class="aliases-empty">Teste ou salve o SQL para detectar as colunas.</span>';
+        return;
+    }
+    el.innerHTML = aliases.map(a=>'<span class="alias-tag">'+escH(a)+'</span>').join('');
+    // Atualizar dropdowns de parâmetros de ligação após detectar colunas
+    if (mode !== 'principal') _refreshJoinSqlDropdowns();
+}
+
+// Atualiza as opções dos dropdowns de parâmetro (:nome) nas linhas de join existentes
+function _refreshJoinSqlDropdowns() {
+    const params = _getParamsFromSql();
+    document.querySelectorAll('#joinPairsList .jp-param-sql').forEach(sel => {
+        const current = sel.value;
+        const opts = params.length
+            ? '<option value="">Selecione parâmetro...</option>' +
+              params.map(p => '<option value="'+escH(p)+'"'+(p===current?' selected':'')+'>:'+escH(p)+'</option>').join('')
+            : (current
+                ? '<option value="'+escH(current)+'" selected>:'+escH(current)+'</option>'
+                : '<option value="">Escreva :parametro no SQL</option>');
+        sel.innerHTML = opts;
+    });
+}
+function clearAliases() {
+    document.getElementById('aliasesTags').innerHTML='<span class="aliases-empty">Teste ou salve o SQL para detectar as colunas.</span>';
+}
+
+document.getElementById('sqlTextarea').addEventListener('keydown', e=>{
+    if (e.ctrlKey && e.key==='Enter') { e.preventDefault(); testar(); }
+    if (e.ctrlKey && e.key==='s')     { e.preventDefault(); salvar(); }
+    if (e.key==='Tab') {
+        e.preventDefault();
+        const t=e.target, s=t.selectionStart, en=t.selectionEnd;
+        t.value=t.value.substring(0,s)+'  '+t.value.substring(en);
+        t.selectionStart=t.selectionEnd=s+2;
+    }
+});
+
+window._principalSQL    = `{{ sql_ativo|escapejs }}`;
+window._principalCampos = {{ campos_sql|safe }};
+window._aliasCache      = {};
+
+/* ── Parâmetros SQL ↔ Campos do pedido ── */
+let _camposPedidoCache = null;
+
+async function loadCamposPedido() {
+    if (_camposPedidoCache) return _camposPedidoCache;
+    try {
+        const resp = await fetch('/firebird/campos-disponiveis/', { credentials: 'same-origin' });
+        const json = await resp.json();
+        if (json.success) {
+            _camposPedidoCache = [...(json.campos_diretos||[]), ...(json.campos_json||[])];
+            return _camposPedidoCache;
+        }
+    } catch(e) {}
+    return ['numero_pedido', 'cliente_nome', 'entregador'];
+}
+
+// Extrai parâmetros nomeados (:nome) do SQL atual
+function _getParamsFromSql() {
+    const sql = document.getElementById('sqlTextarea').value;
+    const seen = new Set();
+    const result = [];
+    const re = /:[a-zA-Z_][a-zA-Z0-9_]*/g;
+    let m;
+    while ((m = re.exec(sql)) !== null) {
+        const name = m[0].slice(1);
+        if (!seen.has(name)) { seen.add(name); result.push(name); }
+    }
+    return result;
+}
+
+// Retorna conjunto de params já configurados nas linhas existentes
+function _getConfiguredParams() {
+    const set = new Set();
+    document.querySelectorAll('#joinPairsList .jp-param-sql').forEach(sel => {
+        if (sel.value) set.add(sel.value);
+    });
+    return set;
+}
+
+function createJoinPairRow(paramSql, campoPedido) {
+    const row = document.createElement('div');
+    row.className = 'join-pair-row';
+    // Dropdown esquerdo: parâmetros detectados no SQL (:nome)
+    const params = _getParamsFromSql();
+    const paramOpts = params.length
+        ? '<option value="">Selecione parâmetro...</option>' +
+          params.map(p => '<option value="' + escH(p) + '"' + (p === paramSql ? ' selected' : '') + '>:' + escH(p) + '</option>').join('')
+        : (paramSql
+            ? '<option value="' + escH(paramSql) + '" selected>:' + escH(paramSql) + '</option>'
+            : '<option value="">Escreva :parametro no SQL</option>');
+    row.innerHTML =
+        '<select class="jp-param-sql" title="Parâmetro neste SQL (ex: :empresa)">' + paramOpts + '</select>' +
+        '<span class="jp-arrow">←</span>' +
+        '<select class="jp-campo-pedido" title="Campo do pedido (fonte do valor)"><option value="">Carregando...</option></select>' +
+        '<button type="button" class="btn-jp-remove" title="Remover">×</button>';
+    // Popular dropdown direito com campos do pedido
+    const selPedido = row.querySelector('.jp-campo-pedido');
+    loadCamposPedido().then(campos => {
+        selPedido.innerHTML = '<option value="">Selecione campo do pedido...</option>' +
+            campos.map(c => '<option value="' + escH(c) + '"' + (c === campoPedido ? ' selected' : '') + '>' + escH(c) + '</option>').join('');
+    });
+    row.querySelector('.btn-jp-remove').addEventListener('click', () => {
+        row.remove();
+        toggleJoinEmpty();
+    });
+    return row;
+}
+
+function toggleJoinEmpty() {
+    const list = document.getElementById('joinPairsList');
+    const empty = document.getElementById('joinPairsEmpty');
+    empty.style.display = list.querySelectorAll('.join-pair-row').length > 0 ? 'none' : '';
+}
+
+function setJoinPairs(pairs) {
+    const list = document.getElementById('joinPairsList');
+    list.querySelectorAll('.join-pair-row').forEach(r => r.remove());
+    (pairs || []).forEach(p => {
+        list.appendChild(createJoinPairRow(p.coluna_sql || '', p.campo_pedido || ''));
+    });
+    toggleJoinEmpty();
+}
+
+function getJoinPairs() {
+    const pairs = [];
+    document.querySelectorAll('#joinPairsList .join-pair-row').forEach(row => {
+        const paramSql   = row.querySelector('.jp-param-sql').value.trim();
+        const campoPedido = row.querySelector('.jp-campo-pedido').value.trim();
+        if (paramSql && campoPedido) {
+            pairs.push({ coluna_sql: paramSql, campo_pedido: campoPedido });
+        }
+    });
+    return pairs;
+}
+
+// Detectar automaticamente parâmetros do SQL e criar linhas
+document.getElementById('btnJoinDetect').addEventListener('click', () => {
+    const params = _getParamsFromSql();
+    if (!params.length) { toast('Nenhum parâmetro (:nome) encontrado no SQL.', 'err'); return; }
+    const configured = _getConfiguredParams();
+    const list = document.getElementById('joinPairsList');
+    let added = 0;
+    params.forEach(p => {
+        if (!configured.has(p)) {
+            list.appendChild(createJoinPairRow(p, ''));
+            added++;
+        }
+    });
+    toggleJoinEmpty();
+    if (added === 0) toast('Todos os parâmetros já estão configurados.', '');
+    else toast('✅ ' + added + ' parâmetro(s) detectado(s). Vincule aos campos do pedido.', 'ok');
+});
+
+document.getElementById('btnJoinAdd').addEventListener('click', () => {
+    const list = document.getElementById('joinPairsList');
+    list.appendChild(createJoinPairRow('', ''));
+    toggleJoinEmpty();
+});
+</script>
+</body>
+</html>

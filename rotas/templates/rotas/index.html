@@ -1,0 +1,4259 @@
+{% load static l10n %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fermap Logística - Gerenciador de Rotas</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet-routing-machine/3.2.12/leaflet-routing-machine.min.css" />
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" href="{% static 'raio-x/raio-x.css' %}">
+    <style>
+        :root {
+            --pedidos-panel-width: {{ config.pedidos_panel_largura|default:320 }}px;
+            --pedidos-card-bg: {{ config.pedidos_card_cor_fundo|default:'#ffffff' }};
+            --pedidos-card-border: {{ config.pedidos_card_cor_borda|default:'#dfe3e8' }};
+            --pedidos-card-font: {{ config.pedidos_card_tamanho_fonte|default:12 }}px;
+            --pedidos-card-pad-y: {{ config.pedidos_card_padding_vertical|default:8 }}px;
+            --pedidos-card-pad-x: {{ config.pedidos_card_padding_horizontal|default:8 }}px;
+            
+            /* Variáveis para cards de rota */
+            --rotas-card-bg: {{ config.rotas_card_cor_fundo|default:'#ffffff' }};
+            --rotas-card-border: {{ config.rotas_card_cor_borda|default:'#dadce0' }};
+            --rotas-card-font: {{ config.rotas_card_tamanho_fonte|default:13 }}px;
+            --rotas-card-pad-y: {{ config.rotas_card_padding_vertical|default:12 }}px;
+            --rotas-card-pad-x: {{ config.rotas_card_padding_horizontal|default:12 }}px;
+            --rotas-card-raio: {{ config.rotas_card_raio|default:8 }}px;
+            --rotas-card-numero-cor: {{ config.rotas_card_cor_numero|default:'#4285F4' }};
+        }
+
+        #map { margin-right: var(--pedidos-panel-width); }
+        .pedidos-panel {
+            position: fixed;
+            right: 0;
+            top: 0;
+            width: var(--pedidos-panel-width);
+            height: 100vh;
+            background: #fff;
+            box-shadow: -2px 0 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            border-left: 1px solid #e5e7eb;
+        }
+        .pedidos-header { padding: 14px; background: #22a447; color: #fff; font-weight: 700; }
+        .pedidos-header-row { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+        .btn-tela-cheia {
+            border: 1px solid rgba(255,255,255,.4);
+            background: rgba(255,255,255,.15);
+            color: #fff;
+            border-radius: 6px;
+            padding: 4px 8px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        .btn-tela-cheia.is-active {
+            border-color: #86efac;
+            background: #ecfdf3;
+            color: #166534;
+        }
+        .pedidos-panel.fullscreen {
+            width: 100vw;
+            left: 0;
+            right: 0;
+            z-index: 3000;
+        }
+        body.pedidos-fullscreen #map { margin-right: 0; }
+        .pedidos-filter { padding: 10px; border-bottom: 1px solid #eee; }
+        .pedidos-filter-top { display:flex; gap:6px; align-items:center; }
+        .pedidos-filter-top input { flex:1; min-width:0; }
+        .btn-toggle-rotas {
+            border: 1px solid #d1d5db;
+            background: #fff;
+            color: #374151;
+            border-radius: 6px;
+            padding: 4px 9px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+        .btn-toggle-rotas.is-open { border-color:#22a447; background:#f0fdf4; color:#166534; }
+        .btn-toggle-rotas.is-filtrado { border-color:#f59e0b; background:#fffbeb; color:#92400e; }
+        .rotas-filtro-badge {
+            background: #f59e0b;
+            color: #fff;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 700;
+            min-width: 16px;
+            height: 16px;
+            padding: 0 4px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .rotas-dropdown {
+            overflow: hidden;
+            max-height: 0;
+            transition: max-height 0.25s ease, margin-top 0.25s ease;
+            margin-top: 0;
+        }
+        .rotas-dropdown.is-open { max-height: 220px; margin-top: 8px; }
+        .rotas-checkbox-box { border: 1px solid #e5e7eb; border-radius: 8px; background:#fff; }
+        .rotas-checkbox-header { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 8px; border-bottom:1px solid #eef2f7; font-size:12px; color:#334155; }
+        .rotas-checkbox-actions { display:flex; gap:6px; }
+        .rotas-checkbox-actions button { border:1px solid #d1d5db; background:#fff; color:#374151; border-radius:6px; padding:2px 6px; cursor:pointer; font-size:11px; }
+        .rotas-checkbox-actions button.is-active { border-color:#86efac; background:#ecfdf3; color:#166534; }
+        .rotas-checkbox-list { max-height: 140px; overflow:auto; padding: 6px 8px; display:grid; gap:4px 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .rotas-checkbox-item { display:flex; align-items:center; gap:6px; font-size:12px; color:#111827; }
+        .rotas-checkbox-item input { width:auto; }
+        .pedidos-filter-actions { display:flex; justify-content:flex-end; margin-top:8px; }
+        .btn-limpar-filtros {
+            border: 1px solid #d1d5db;
+            background: #fff;
+            color: #374151;
+            border-radius: 6px;
+            padding: 4px 8px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .btn-limpar-filtros.is-active { border-color:#86efac; background:#ecfdf3; color:#166534; }
+        .btn-config-campos {
+            border: 1px solid rgba(255,255,255,.45);
+            background: rgba(255,255,255,.18);
+            color: #fff;
+            border-radius: 6px;
+            padding: 4px 8px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 700;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .btn-editar-card {
+            border: 1px solid rgba(255,255,255,.45);
+            background: rgba(255,255,255,.18);
+            color: #fff;
+            border-radius: 6px;
+            padding: 4px 8px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        .card-fields-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, .42);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 4500;
+            padding: 12px;
+        }
+        .card-fields-modal.open { display: flex; }
+        .card-fields-dialog {
+            width: min(560px, 96vw);
+            max-height: 82vh;
+            min-width: 520px;
+            min-height: 420px;
+            background: #fff;
+            border-radius: 12px;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 10px 30px rgba(0,0,0,.18);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            resize: both;
+        }
+        .card-fields-dialog.maximized {
+            width: 96vw;
+            max-width: 96vw;
+            height: 92vh;
+            max-height: 92vh;
+            min-width: 96vw;
+            min-height: 92vh;
+            resize: none;
+        }
+        .card-fields-header {
+            padding: 12px 14px;
+            border-bottom: 1px solid #e5e7eb;
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:8px;
+        }
+        .card-fields-header strong { color:#0f172a; font-size:14px; }
+        .card-fields-actions { display:flex; gap:6px; }
+        .card-fields-actions button {
+            border:1px solid #d1d5db;
+            background:#fff;
+            color:#374151;
+            border-radius:6px;
+            padding:4px 8px;
+            cursor:pointer;
+            font-size:12px;
+            font-weight:600;
+        }
+        .btn-expand-modal.is-active {
+            border-color:#86efac;
+            background:#ecfdf3;
+            color:#166534;
+        }
+        .card-fields-toolbar {
+            padding: 10px 14px;
+            border-bottom: 1px solid #eef2f7;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .card-fields-toolbar input {
+            flex: 1;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 12px;
+        }
+        .card-color-rules {
+            margin: 0 14px 10px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #f8fafc;
+            overflow: hidden;
+        }
+        .card-color-rules-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 8px 10px;
+            border-bottom: 1px solid #e5e7eb;
+            background: #fff;
+        }
+        .card-color-rules-head strong { font-size: 12px; color: #0f172a; }
+        .card-color-rules-head small { color: #64748b; font-size: 11px; }
+        .btn-add-regra-cor {
+            border: 1px solid #0f766e;
+            background: #14b8a6;
+            color: #fff;
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .card-color-rules-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 220px;
+            overflow: auto;
+            padding: 8px;
+        }
+        .card-color-rule-item {
+            border: 1px solid #dbe3ef;
+            border-radius: 8px;
+            background: #fff;
+            padding: 8px;
+            display: grid;
+            gap: 6px;
+        }
+        .card-color-rule-head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: #0f172a;
+        }
+        .card-color-rule-head b {
+            min-width: 32px;
+            color: #334155;
+        }
+        .card-color-rule-order {
+            margin-left: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .card-color-rule-order button,
+        .btn-remover-regra-cor {
+            border: 1px solid #cbd5e1;
+            background: #fff;
+            color: #334155;
+            border-radius: 5px;
+            width: 22px;
+            height: 22px;
+            line-height: 1;
+            cursor: pointer;
+            font-weight: 700;
+            padding: 0;
+        }
+        .btn-remover-regra-cor {
+            border-color: #fecaca;
+            color: #b91c1c;
+        }
+        .card-color-rule-labels {
+            display: grid;
+            grid-template-columns: 1.1fr .9fr 1fr 50px .7fr .7fr .7fr;
+            gap: 6px;
+            margin-bottom: 4px;
+        }
+        .card-color-rule-labels span {
+            font-size: 11px;
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+        }
+        .card-color-rule-grid {
+            display: grid;
+            grid-template-columns: 1.1fr .9fr 1fr 50px .7fr .7fr .7fr;
+            gap: 6px;
+        }
+        .card-color-rule-grid input,
+        .card-color-rule-grid select {
+            width: 100%;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            padding: 5px 6px;
+            font-size: 12px;
+            background: #fff;
+        }
+        .card-color-rule-grid input[type="color"] {
+            height: 32px;
+            padding: 2px;
+            cursor: pointer;
+        }
+        .color-input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 2px;
+        }
+        .color-input-wrapper input[type="color"] {
+            flex: 1;
+        }
+        .btn-reset-color {
+            width: 20px;
+            height: 20px;
+            border: none;
+            background: #ef4444;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .btn-reset-color:hover {
+            background: #dc2626;
+        }
+        /* Botão abre paleta */
+        .btn-palette-open {
+            width: 20px;
+            height: 20px;
+            border: 1px solid #cbd5e1;
+            background: #f8fafc;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            line-height: 1;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: background .12s;
+        }
+        .btn-palette-open:hover { background: #e2e8f0; }
+        /* Popup paleta de cores */
+        #colorPalettePopup {
+            position: fixed;
+            z-index: 10500;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            box-shadow: 0 8px 28px rgba(0,0,0,.2);
+            padding: 10px;
+            display: none;
+            width: 198px;
+        }
+        #colorPalettePopup.open { display: block; }
+        .palette-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: #64748b;
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .palette-close-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            color: #94a3b8;
+            line-height: 1;
+            padding: 0;
+        }
+        .palette-close-btn:hover { color: #334155; }
+        .palette-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 3px;
+            margin-bottom: 8px;
+        }
+        .palette-swatch {
+            width: 100%;
+            aspect-ratio: 1;
+            border-radius: 4px;
+            cursor: pointer;
+            border: 1.5px solid transparent;
+            transition: transform .1s, border-color .1s;
+            box-sizing: border-box;
+        }
+        .palette-swatch:hover { transform: scale(1.2); border-color: #334155; }
+        .palette-custom-row {
+            border-top: 1px solid #e2e8f0;
+            padding-top: 7px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+            color: #64748b;
+        }
+        .palette-custom-row input[type="color"] {
+            width: 34px;
+            height: 26px;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            padding: 1px 2px;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .palette-custom-apply {
+            flex: 1;
+            padding: 3px 6px;
+            font-size: 11px;
+            background: #2563eb;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .palette-custom-apply:hover { background: #1d4ed8; }
+        .card-color-rules-empty {
+            color: #64748b;
+            font-size: 12px;
+            text-align: center;
+            padding: 10px;
+            border: 1px dashed #cbd5e1;
+            border-radius: 8px;
+            background: #fff;
+        }
+        .rule-valor-entre {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            width: 100%;
+        }
+        .rule-valor-entre input {
+            flex: 1;
+            min-width: 0;
+        }
+        .rule-valor-entre span {
+            font-size: 11px;
+            color: #64748b;
+            flex-shrink: 0;
+        }
+
+        /* Tab bar de múltiplas rotas */
+        .route-tabs-wrapper {
+            border-bottom: 1px solid #e2e8f0;
+            background: #f8fafc;
+        }
+        .route-tabs-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 12px 4px;
+            background: linear-gradient(90deg, #ea580c 0%, #f97316 100%);
+        }
+        .route-tabs-header-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: rgba(255,255,255,.65);
+            flex-shrink: 0;
+            animation: rtPulse 2s ease-in-out infinite;
+        }
+        @keyframes rtPulse {
+            0%, 100% { opacity: .65; }
+            50%       { opacity: 1; transform: scale(1.25); }
+        }
+        .route-tabs-header-label {
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: .7px;
+            text-transform: uppercase;
+            color: #fff;
+        }
+        .route-tabs-bar {
+            display: flex;
+            align-items: stretch;
+            gap: 4px;
+            padding: 6px 10px;
+            overflow-x: auto;
+            scrollbar-width: none;
+            flex-wrap: nowrap;
+            min-height: 44px;
+        }
+        .route-tabs-bar::-webkit-scrollbar { display: none; }
+        .route-tab {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 12px 5px 10px;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 20px;
+            font-size: clamp(11px, 2vw, 15px);
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all .15s;
+            background: #f8fafc;
+            color: #475569;
+            line-height: 1;
+            flex: 1 1 0;
+            min-width: 0;
+            max-width: 220px;
+            justify-content: center;
+        }
+        .route-tab:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+        .route-tab.active {
+            font-weight: 800;
+            font-size: clamp(13px, 2.5vw, 17px);
+            padding: 7px 14px 7px 11px;
+            flex: 1.6 1 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,.18);
+        }
+        .route-tab-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .route-tab-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            min-width: 0;
+        }
+        .route-tab-content {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            line-height: 1.2;
+            min-width: 0;
+            overflow: hidden;
+        }
+        .route-tab-date {
+            font-size: .72em;
+            font-weight: 500;
+            opacity: 0.75;
+            white-space: nowrap;
+        }
+        .route-tab-badge {
+            padding: 1px 6px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        .route-tab-close {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 13px;
+            padding: 0 0 0 2px;
+            line-height: 1;
+            opacity: .6;
+            color: inherit;
+        }
+        .route-tab-close:hover { opacity: 1; }
+        /* ── Popup de edição de aba ──────────────────────────────── */
+        .route-tab-edit-popup {
+            position: fixed;
+            z-index: 9999;
+            background: #fff;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 12px 14px 10px;
+            box-shadow: 0 8px 32px rgba(0,0,0,.18), 0 2px 8px rgba(0,0,0,.08);
+            min-width: 320px;
+            max-width: calc(100vw - 16px);
+        }
+        .route-tab-edit-popup label {
+            display: block;
+            font-size: 10px;
+            font-weight: 700;
+            color: #64748b;
+            margin-bottom: 3px;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+        }
+        .route-tab-edit-popup input[type=text],
+        .route-tab-edit-popup input[type=date],
+        .route-tab-edit-popup select {
+            width: 100%;
+            padding: 5px 9px;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 13px;
+            outline: none;
+            box-sizing: border-box;
+            transition: border-color .12s;
+        }
+        .route-tab-edit-popup input:focus { border-color: #93c5fd; }
+        .route-tab-edit-popup input.rte-invalid {
+            border-color: #ef4444;
+            background: #fff5f5;
+        }
+        .rte-row { margin-bottom: 9px; }
+        .rte-fixed-row {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        .rte-fixed-actions {
+            display: flex;
+            gap: 6px;
+            margin-top: 6px;
+            flex-wrap: wrap;
+        }
+        .rte-actions { display: flex; gap: 5px; margin-top: 10px; }
+        .rte-error {
+            margin-top: 8px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #dc2626;
+        }
+        .rte-btn {
+            flex: 1;
+            padding: 5px 8px;
+            border-radius: 8px;
+            border: 1.5px solid #e2e8f0;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            background: #f8fafc;
+            color: #475569;
+            transition: all .12s;
+            white-space: nowrap;
+        }
+        .rte-btn:disabled {
+            opacity: .55;
+            cursor: not-allowed;
+        }
+        .rte-btn-mini {
+            flex: 0 0 auto;
+            padding: 5px 10px;
+        }
+        .rte-btn-danger {
+            border-color: #fecaca;
+            background: #fff1f2;
+            color: #b91c1c;
+        }
+        .rte-btn:hover { border-color: #93c5fd; background: #eff6ff; color: #2563eb; }
+        .rte-btn-danger:hover {
+            border-color: #fca5a5;
+            background: #ffe4e6;
+            color: #991b1b;
+        }
+        .rte-btn-confirm {
+            flex: 0 0 auto;
+            padding: 5px 14px;
+            background: #2563eb;
+            color: #fff;
+            border-color: #2563eb;
+        }
+        .rte-btn-confirm:hover { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+        .route-tab-add {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            border: 1.5px dashed #94a3b8;
+            background: none;
+            color: #64748b;
+            font-size: 16px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: all .15s;
+            font-weight: 600;
+        }
+        .route-tab-add:hover { border-color: #2563eb; color: #2563eb; background: #eff6ff; }
+        .pedido-slot-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            font-size: 9px;
+            font-weight: 700;
+            color: #fff;
+            margin-left: 3px;
+            vertical-align: middle;
+            flex-shrink: 0;
+        }
+
+        /* Painel de botões retrátil */
+        .btn-grid-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            padding: 5px 15px;
+            background: #f1f5f9;
+            border: none;
+            border-bottom: 1px solid #e2e8f0;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 600;
+            color: #475569;
+            transition: background .15s;
+            text-align: left;
+            user-select: none;
+        }
+        .btn-grid-toggle:hover { background: #e2e8f0; }
+        .btn-grid-toggle-arrow {
+            font-size: 10px;
+            transition: transform .2s;
+            display: inline-block;
+        }
+        .btn-grid-toggle-arrow.collapsed { transform: rotate(180deg); }
+        .btn-grid.collapsed { display: none; }
+        .search-area.collapsed { display: none; }
+
+        /* Configurações visuais dos cards de rota */
+        .rotas-visual-config {
+            padding: 14px;
+            border-bottom: 1px solid #eef2f7;
+            background: #f8fafc;
+        }
+        .rotas-visual-config-head {
+            margin-bottom: 16px;
+        }
+        .rotas-visual-config-head strong {
+            display: block;
+            font-size: 13px;
+            color: #0f172a;
+            margin-bottom: 4px;
+        }
+        .rotas-visual-config-head small {
+            display: block;
+            color: #64748b;
+            font-size: 11px;
+        }
+        .rotas-visual-config-content {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .rotas-config-section {
+            background: #fff;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+        .rotas-config-label {
+            display: block;
+            margin-bottom: 10px;
+            color: #0f172a;
+            font-size: 12px;
+        }
+        .rotas-config-checkboxes {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .rotas-config-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            color: #374151;
+        }
+        .rotas-config-checkbox input[type="checkbox"] {
+            cursor: pointer;
+        }
+        .rotas-config-colors {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+        .rotas-config-color-input {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .rotas-config-color-input span {
+            font-size: 11px;
+            color: #64748b;
+            font-weight: 500;
+        }
+        .rotas-config-color-input input[type="color"] {
+            width: 100%;
+            height: 36px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .rotas-config-dimensions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .rotas-config-dimension-input {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .rotas-config-dimension-input span {
+            font-size: 11px;
+            color: #64748b;
+            font-weight: 500;
+        }
+        .rotas-config-dimension-input input[type="number"] {
+            width: 100%;
+            padding: 6px 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 12px;
+        }
+        .rotas-config-actions {
+            display: flex;
+            justify-content: flex-end;
+        }
+        .btn-save-rotas-visual {
+            border: 1px solid #059669;
+            background: #10b981;
+            color: #fff;
+            border-radius: 6px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 700;
+            transition: background 0.2s;
+        }
+        .btn-save-rotas-visual:hover {
+            background: #059669;
+        }
+        .card-type-selector {
+            padding: 10px 14px;
+            border-bottom: 1px solid #eef2f7;
+            background: #f8fafc;
+        }
+        .card-type-selector-header {
+            font-size: 11px;
+            font-weight: 600;
+            color: #64748b;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        .card-type-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        .btn-card-type {
+            flex: 1;
+            border: 2px solid #d1d5db;
+            background: #fff;
+            color: #374151;
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        .btn-card-type:hover {
+            border-color: #9ca3af;
+        }
+        .btn-card-type.active {
+            border-color: #2563eb;
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        .card-fields-list {
+            padding: 10px 14px;
+            overflow: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .card-fields-item {
+            display:grid;
+            grid-template-columns: auto 1fr;
+            align-items:start;
+            gap:6px;
+            font-size:12px;
+            color:#111827;
+            border:1px solid #e5e7eb;
+            border-radius:8px;
+            padding:6px 8px;
+            background:#f9fafb;
+        }
+        .card-fields-main {
+            display:flex;
+            align-items:center;
+            gap:8px;
+            margin-bottom:6px;
+            grid-column: 1 / -1;
+        }
+        .card-fields-main input[type="checkbox"] { margin-top: 0; }
+        .card-fields-name { font-weight: 700; color:#0f172a; }
+        .card-fields-order {
+            margin-left: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .card-fields-order b {
+            font-size: 11px;
+            color: #475569;
+            min-width: 26px;
+            text-align: right;
+        }
+        .card-fields-order button {
+            border: 1px solid #cbd5e1;
+            background: #fff;
+            color: #334155;
+            border-radius: 5px;
+            width: 22px;
+            height: 22px;
+            line-height: 1;
+            cursor: pointer;
+            font-weight: 700;
+        }
+        .card-fields-order button:disabled {
+            opacity: .45;
+            cursor: not-allowed;
+        }
+        .card-fields-config {
+            display:grid;
+            grid-template-columns: 1.2fr .7fr .7fr .7fr .8fr .8fr .8fr;
+            gap:6px;
+            width:100%;
+            grid-column: 1 / -1;
+        }
+        .card-fields-config input,
+        .card-fields-config select {
+            width:100%;
+            border:1px solid #d1d5db;
+            border-radius:6px;
+            padding:5px 6px;
+            font-size:12px;
+            background:#fff;
+        }
+        .card-fields-empty {
+            color:#64748b;
+            text-align:center;
+            padding:14px;
+            border:1px dashed #cbd5e1;
+            border-radius:8px;
+            background:#f8fafc;
+            font-size:12px;
+        }
+        .card-fields-footer {
+            padding: 10px 14px;
+            border-top: 1px solid #e5e7eb;
+            display:flex;
+            justify-content:flex-end;
+            gap:8px;
+        }
+        .card-fields-footer button {
+            border-radius:6px;
+            padding:6px 10px;
+            cursor:pointer;
+            font-size:12px;
+            font-weight:700;
+            border:1px solid #d1d5db;
+            background:#fff;
+            color:#374151;
+        }
+        .card-fields-footer .btn-save-fields {
+            border-color:#16a34a;
+            background:#22c55e;
+            color:#fff;
+        }
+        .card-fields-dialog.rules-focus .card-fields-toolbar,
+        .card-fields-dialog.rules-focus #cardFieldsList,
+        .card-fields-dialog.rules-focus #btnCamposTodos,
+        .card-fields-dialog.rules-focus #btnCamposNenhum {
+            display: none !important;
+        }
+        .card-fields-dialog.rules-focus .card-color-rules {
+            margin-top: 10px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .card-fields-dialog.rules-focus .card-color-rules-list {
+            max-height: none;
+            flex: 1;
+        }
+        .toast-container {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            z-index: 5000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            pointer-events: none;
+        }
+        .toast-item {
+            min-width: 240px;
+            max-width: 360px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            box-shadow: 0 8px 20px rgba(15,23,42,.18);
+            color: #fff;
+            font-size: 12px;
+            font-weight: 600;
+            opacity: 0;
+            transform: translateY(-6px);
+            transition: opacity .18s ease, transform .18s ease;
+        }
+        .toast-item.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .toast-item.success { background: #16a34a; }
+        .toast-item.error { background: #dc2626; }
+        .toast-item.info { background: #2563eb; }
+        .pedidos-list { flex: 1; min-height: 0; overflow: auto; padding: 10px; background: #f7f9fc; }
+        .pedido-card {
+            background: var(--pedidos-card-bg);
+            border: 1px solid var(--pedidos-card-border);
+            border-radius: 10px;
+            padding: var(--pedidos-card-pad-y) var(--pedidos-card-pad-x);
+            margin-bottom: 8px;
+            font-size: var(--pedidos-card-font);
+            line-height: 1.35;
+        }
+        .pedido-card-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+        .pedido-card .numero { color: #188038; font-weight: 700; margin-bottom: 0; }
+        .pedido-card .campo { margin: 2px 0; color: #334155; }
+        .btn-add-rota {
+            border: 1px solid #b6d0ff;
+            background: #eef4ff;
+            color: #1d4ed8;
+            border-radius: 6px;
+            width: 24px;
+            height: 24px;
+            padding: 0;
+            cursor: pointer;
+            font-size: 16px;
+            line-height: 1;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .btn-add-rota.is-added {
+            border-color: #86efac;
+            background: #ecfdf3;
+            color: #166534;
+        }
+        .btn-add-rota:disabled {
+            opacity: .65;
+            cursor: not-allowed;
+        }
+        .btn-arquivar-pedido, .btn-restaurar-pedido {
+            border-radius: 6px;
+            width: 24px;
+            height: 24px;
+            padding: 0;
+            cursor: pointer;
+            font-size: 16px;
+            line-height: 1;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .btn-arquivar-pedido {
+            border: 1px solid #fca5a5;
+            background: #fff1f1;
+            color: #b91c1c;
+        }
+        .btn-arquivar-pedido:hover { background: #fee2e2; }
+        .btn-restaurar-pedido {
+            border: 1px solid #86efac;
+            background: #f0fdf4;
+            color: #166534;
+            font-size: 13px;
+        }
+        .btn-restaurar-pedido:hover { background: #dcfce7; }
+        .btn-info-raio-x {
+            border: 1px solid #93c5fd;
+            background: #eff6ff;
+            color: #1d4ed8;
+            border-radius: 6px;
+            width: 24px;
+            height: 24px;
+            padding: 0;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-style: italic;
+            font-family: Georgia, serif;
+        }
+        .btn-info-raio-x:hover { background: #dbeafe; }
+        /* ── Raio X agora é React (CSS carregado via static) ── */
+        .pedido-card.is-arquivado {
+            opacity: 0.7;
+            border-left: 3px solid #f87171 !important;
+        }
+        .btn-ver-arquivados {
+            border: 1px solid #cbd5e1;
+            background: #f1f5f9;
+            color: #475569;
+            border-radius: 6px;
+            padding: 2px 8px;
+            font-size: 12px;
+            cursor: pointer;
+            position: relative;
+        }
+        .btn-ver-arquivados.active {
+            border-color: #f87171;
+            background: #fff1f1;
+            color: #b91c1c;
+        }
+        .arquivados-badge {
+            position: absolute;
+            top: -6px; right: -6px;
+            background: #ef4444;
+            color: #fff;
+            border-radius: 10px;
+            font-size: 10px;
+            min-width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 3px;
+        }
+        .pedido-card-btns {
+            display: flex;
+            flex-direction: row;
+            gap: 3px;
+            align-items: center;
+        }
+        .pedido-card .sem-coord { color: #c62828; font-size: 11px; margin-top: 6px; }
+        .pedido-empty { color: #64748b; text-align: center; padding: 24px 10px; }
+        .pedidos-panel.fullscreen .pedidos-list {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            gap: 12px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            align-items: stretch;
+            padding: 10px;
+        }
+        .rota-column {
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 10px;
+            flex: 0 0 270px;
+            min-width: 200px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .rota-column-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .rota-column-count {
+            font-size: 11px;
+            font-weight: 600;
+            color: #64748b;
+        }
+        /* Modal de resumo de importação */
+        .import-summary-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 5000;
+            padding: 16px;
+        }
+        .import-summary-modal.is-open {
+            display: flex;
+        }
+        .import-summary-dialog {
+            width: min(540px, 96vw);
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 15px 40px rgba(0,0,0,.25);
+            border: 1px solid #e5e7eb;
+            overflow: hidden;
+        }
+        .import-summary-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 14px;
+            border-bottom: 1px solid #e5e7eb;
+            background: #f8fafc;
+        }
+        .import-summary-header strong {
+            color: #0f172a;
+            font-size: 14px;
+        }
+        .btn-close-summary {
+            border: none;
+            background: transparent;
+            font-size: 18px;
+            cursor: pointer;
+            line-height: 1;
+            color: #475569;
+        }
+        .import-summary-body {
+            padding: 14px;
+            display: grid;
+            gap: 10px;
+        }
+        .import-summary-message {
+            margin: 0;
+            color: #0f172a;
+            font-size: 13px;
+        }
+        .import-summary-list-wrap {
+            max-height: 320px;
+            overflow: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 8px;
+            background: #f8fafc;
+        }
+        .import-summary-item {
+            padding: 8px;
+            border-radius: 6px;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            margin-bottom: 6px;
+        }
+        .import-summary-item:last-child { margin-bottom: 0; }
+        .import-summary-item .titulo { font-weight: 700; color: #0f172a; }
+        .import-summary-item .detalhe { font-size: 12px; color: #475569; }
+        @media (max-width: 1024px) {
+            #map { margin-right: 0; }
+            .pedidos-panel { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="loading">⌛ Calculando Rota...</div>
+
+<div id="summary-card">
+    <div class="summary-item">
+        <i class="material-icons">directions_car</i>
+        <div class="summary-text"><span class="summary-label">Distância</span><span class="summary-value" id="total-dist">0 km</span></div>
+    </div>
+    <div class="divider"></div>
+    <div class="summary-item">
+        <i class="material-icons">schedule</i>
+        <div class="summary-text"><span class="summary-label">Tempo</span><span class="summary-value" id="total-time">0 min</span></div>
+    </div>
+</div>
+
+<div class="sidebar">
+    <div class="sidebar-header">
+        <div class="sidebar-header-top">
+            <h2>Fermap Logística</h2>
+            <div class="config-menu" id="configMenu">
+                <button type="button" id="configMenuToggle" class="config-menu-toggle" title="Configurações" aria-label="Abrir configurações" aria-expanded="false">⚙️</button>
+                <div class="config-menu-list">
+                    <a href="{% url 'rotas:configuracao_usuario' %}">Configurações da Conta</a>
+                    <a href="{% url 'rotas:conexao_firebird' %}">Conexão Firebird</a>
+                    <a href="{% url 'rotas:lista_rotas' %}">Minhas Rotas</a>
+                    <a href="{% url 'rotas:report_designer_list' %}">📊 Editor de Relatórios</a>
+                </div>
+            </div>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+            <p style="font-size: 11px; opacity: 0.8;">Painel de Rota</p>
+<div style="display:flex; gap:4px;">
+                <button type="button" id="btnRotasOpcoes" style="border: 1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.15); color: #fff; border-radius: 4px; padding: 2px 6px; cursor: pointer; font-size: 11px; font-weight: 600;" title="Opções de rota">⚙ Opções</button>
+                <button type="button" id="btnConfigRotaCards" style="border: 1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.15); color: #fff; border-radius: 4px; padding: 2px 6px; cursor: pointer; font-size: 11px; font-weight: 600;" title="Configurar campos dos cards de rota">⚙ Cards</button>
+            </div>
+        </div>
+    </div>
+
+    <button class="btn-grid-toggle" onclick="toggleBtnGrid()" title="Expandir/Recolher ações">
+        <span>⚙ Ações</span>
+        <span class="btn-grid-toggle-arrow" id="btnGridArrow">▲</span>
+    </button>
+
+    <div class="search-area" id="searchAreaContent">
+        <div class="input-group">
+            <label>1. Endereço (Busca Google)</label>
+            <input type="text" id="addressSearch" placeholder="Digite o endereço do cliente...">
+        </div>
+        <div id="mapsStatusNotice" style="display:none; margin-top:8px; padding:8px 10px; border-radius:8px; background:#fff7ed; border:1px solid #fdba74; color:#9a3412; font-size:11px; line-height:1.4;"></div>
+        <div class="input-group">
+            <label>2. Coordenadas (Lat, Long)</label>
+            <input type="text" id="coordsInput" placeholder="-0.034987, -51.074846">
+        </div>
+        <div id="confirmAdd" style="display: none; padding: 10px; background: #e8f0fe; border-radius: 8px; margin-top: 10px;">
+            <div id="editLocationTitle" style="font-size:12px; font-weight:600; color:#2f6ad4; margin-bottom:6px;">Adicionar novo ponto</div>
+            <input type="text" id="manualName" placeholder="Nome do Cliente">
+            <input type="text" id="manualObs" placeholder="Observação">
+            <div style="display:flex; gap:6px; margin-top:6px;">
+                <button id="confirmAddBtn" class="btn" style="background: var(--p); flex:1;" onclick="confirmAddPoint()">Confirmar Adição</button>
+                <button class="btn" style="background:#70757a; width:110px;" onclick="endEditLocationMode()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+    <div class="btn-grid" id="btnGridContent">
+        <button class="btn btn-opt" onclick="optimizeRouteWithReturn()">✨ Otimizar Rota</button>
+        <button class="btn btn-invert" onclick="reverseMiddleRoute()">🔄 Inverter (Meio)</button>
+        <button class="btn btn-invert" onclick="abrirOrdenarPorCampo()" title="Ordenar paradas por um campo do pedido">⇅ Ordenar por Campo</button>
+        <button class="btn btn-csv" onclick="document.getElementById('csvFile').click()">📁 Importar CSV</button>
+        <input type="file" id="csvFile" accept=".csv" style="display:none">
+        <button type="button" id="btnImportarAgora" class="btn btn-opt" style="text-decoration: none; display: block; text-align: center; background: #0d6efd;">⚡ Importar Agora</button>
+        <button class="btn btn-opt" style="background: #28a745;" onclick="salvarRotaMapa()">💾 Salvar Rota</button>
+        <button class="btn btn-pdf" onclick="gerarPdfRota()" title="Salve a rota primeiro para escolher o layout de impressão">📄 Gerar PDF</button>
+        <button class="btn btn-wa" onclick="sendToWhatsApp()">💬 WhatsApp</button>
+    </div>
+
+    <div class="route-tabs-wrapper">
+        <div class="route-tabs-header">
+            <span class="route-tabs-header-dot"></span>
+            <span class="route-tabs-header-label">Rotas em Andamento</span>
+        </div>
+        <div id="routeTabsBar" class="route-tabs-bar"></div>
+    </div>
+
+    <div id="stopList"></div>
+    <div style="padding: 10px 15px; border-top: 1px solid #ddd;">
+        <button class="btn" style="background: #70757a; width: 100%; font-size: 10px;" onclick="resetMap()">Limpar Tudo</button>
+    </div>
+</div>
+
+<div id="map"></div>
+
+<!-- Modal: Ordenar por Campo -->
+<div id="ordenarCampoModal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.45);" aria-modal="true">
+    <div id="ordenarCampoDialog" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:#fff; border-radius:12px; padding:20px; width:360px; max-width:95vw; box-shadow:0 8px 32px rgba(0,0,0,.25); font-family:sans-serif;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <strong style="font-size:15px;">⇅ Ordenar paradas por campo</strong>
+            <button id="btnFecharOrdenarCampo" style="background:none; border:none; font-size:20px; cursor:pointer; color:#64748b;" title="Fechar">×</button>
+        </div>
+        <label style="font-size:13px; font-weight:600; display:block; margin-bottom:4px;">Campo para agrupar/ordenar:</label>
+        <select id="ordenarCampoSelect" style="width:100%; padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; margin-bottom:12px;"><option value="">— selecione —</option></select>
+        <p style="font-size:12px; color:#64748b; margin-bottom:8px;">Arraste os grupos abaixo para definir a ordem de entrega:</p>
+        <div id="ordenarGruposList" style="border:1px solid #e2e8f0; border-radius:8px; min-height:60px; max-height:260px; overflow-y:auto; background:#f8fafc;"></div>
+        <div style="margin-top:8px; font-size:11px; color:#94a3b8;" id="ordenarGroupCount"></div>
+        <div style="display:flex; gap:8px; margin-top:14px;">
+            <button id="btnAplicarOrdem" style="flex:1; padding:8px; background:#0d6efd; color:#fff; border:none; border-radius:7px; font-size:13px; font-weight:600; cursor:pointer;">✅ Aplicar Ordem</button>
+            <button id="btnCancelarOrdenar" style="flex:1; padding:8px; background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; border-radius:7px; font-size:13px; cursor:pointer;">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<div id="pedidos-panel" class="pedidos-panel">
+    <div class="pedidos-header">
+        <div class="pedidos-header-row">
+            <span>📦 Painel de Pedidos (<span id="pedidosCountIndex">{{ total_pedidos }}</span>)</span>
+            <div style="display:flex; gap:6px;">
+                <button type="button" id="btnVerArquivados" class="btn-ver-arquivados" title="Ver pedidos arquivados">🗂 Arq.<span class="arquivados-badge" id="arquivadosBadge" style="display:none">0</span></button>
+                <button type="button" id="btnHistoricoExclusoes" class="btn-ver-arquivados" title="Histórico de pedidos excluídos" style="background:#f0fdf4; color:#166534; border-color:#86efac;">📋 Histórico</button>
+                <button type="button" id="btnAbrirRegrasCor" class="btn-editar-card" title="Configurar regras de cor dos cards">🎨 Regras</button>
+                <button type="button" id="btnTelaCheiaPedidos" class="btn-tela-cheia" title="Expandir painel">⛶ Tela cheia</button>
+            </div>
+        </div>
+    </div>
+    <div class="pedidos-filter">
+        <div class="pedidos-filter-top">
+            <input type="text" id="filterPedidosIndex" placeholder="Buscar pedido/cliente...">
+            <button type="button" id="btnToggleRotas" class="btn-toggle-rotas" title="Filtrar por rotas">🗺 Rotas<span id="rotasFiltroIndicador" class="rotas-filtro-badge" style="display:none"></span></button>
+        </div>
+        <div id="rotasDropdown" class="rotas-dropdown">
+            <div class="rotas-checkbox-box">
+                <div class="rotas-checkbox-header">
+                    <strong>Rotas</strong>
+                    <div class="rotas-checkbox-actions">
+                        <button type="button" id="btnRotasTodas">Todas</button>
+                        <button type="button" id="btnRotasNenhuma">Nenhuma</button>
+                    </div>
+                </div>
+                <div id="rotasCheckboxList" class="rotas-checkbox-list"></div>
+            </div>
+        </div>
+        <div class="pedidos-filter-actions">
+            <button type="button" id="btnLimparFiltrosPedidos" class="btn-limpar-filtros">Limpar filtros</button>
+            <button type="button" id="btnVisualizarPedidosMapa" class="btn-limpar-filtros btn-visualizar-mapa" title="Visualizar pedidos filtrados no mapa">👁️ Ver no mapa</button>
+        </div>
+    </div>
+    <div class="pedidos-list" id="pedidosListIndex"></div>
+</div>
+
+<div id="cardFieldsModal" class="card-fields-modal" aria-hidden="true">
+    <div class="card-fields-dialog" role="dialog" aria-modal="true" aria-labelledby="cardFieldsTitle">
+        <div class="card-fields-header">
+            <strong id="cardFieldsTitle">Campos do card de pedidos</strong>
+            <div class="card-fields-actions">
+                <button type="button" id="btnExpandirModalCard" class="btn-expand-modal">Expandir</button>
+                <button type="button" id="btnCamposTodos">Todos</button>
+                <button type="button" id="btnCamposNenhum">Nenhum</button>
+            </div>
+        </div>
+        <div style="padding: 8px 14px; border-bottom: 1px solid #eef2f7; background: #f0fdf4;">
+            <a href="{% url 'rotas:editor_sql_page' %}" style="font-size:12px; color:#16a34a; font-weight:600;">📝 Configurar SQL dos campos</a>
+        </div>
+
+        <!-- Seletor de tipo de card -->
+        <div class="card-type-selector">
+            <div class="card-type-selector-header">
+                <strong>Configurar campos para:</strong>
+            </div>
+            <div class="card-type-buttons">
+                <button type="button" id="btnCardTipoPedidos" class="btn-card-type active" data-type="pedidos">
+                    🧾 Cards de Pedidos
+                </button>
+                <button type="button" id="btnCardTipoRotas" class="btn-card-type" data-type="rotas">
+                    🗺️ Cards de Rota
+                </button>
+            </div>
+        </div>
+        
+        <div class="card-fields-toolbar">
+            <input type="text" id="cardFieldsSearch" placeholder="Buscar campo do SQL...">
+        </div>
+        
+        <div id="cardFieldsList" class="card-fields-list"></div>
+        
+        <div class="card-color-rules">
+            <div class="card-color-rules-head">
+                <div>
+                    <strong>Condições de cor do card</strong>
+                    <small>Primeira regra que bater será aplicada no card.</small>
+                </div>
+                <button type="button" id="btnAdicionarRegraCor" class="btn-add-regra-cor">+ Regras</button>
+            </div>
+            <div id="cardColorRulesList" class="card-color-rules-list"></div>
+        </div>
+        <div id="rotasVisualConfig" class="rotas-visual-config" style="display:none;">
+            <div class="rotas-visual-config-head">
+                <strong>🎨 Configurações Visuais dos Cards de Rota</strong>
+                <small>Personalize a aparência dos cards de paradas na rota</small>
+            </div>
+            <div class="rotas-visual-config-content">
+                <div class="rotas-config-section">
+                    <label class="rotas-config-label">
+                        <strong>Cores</strong>
+                    </label>
+                    <div class="rotas-config-colors">
+                        <label class="rotas-config-color-input">
+                            <span>Fundo</span>
+                            <input type="color" id="rotasConfigCorFundo" value="#ffffff">
+                        </label>
+                        <label class="rotas-config-color-input">
+                            <span>Borda</span>
+                            <input type="color" id="rotasConfigCorBorda" value="#dadce0">
+                        </label>
+                        <label class="rotas-config-color-input">
+                            <span>Número</span>
+                            <input type="color" id="rotasConfigCorNumero" value="#4285F4">
+                        </label>
+                    </div>
+                </div>
+                <div class="rotas-config-section">
+                    <label class="rotas-config-label">
+                        <strong>Dimensões</strong>
+                    </label>
+                    <div class="rotas-config-dimensions">
+                        <label class="rotas-config-dimension-input">
+                            <span>Tamanho da fonte (px)</span>
+                            <input type="number" id="rotasConfigTamanhoFonte" value="13" min="8" max="24">
+                        </label>
+                        <label class="rotas-config-dimension-input">
+                            <span>Padding vertical (px)</span>
+                            <input type="number" id="rotasConfigPaddingV" value="12" min="0" max="32">
+                        </label>
+                        <label class="rotas-config-dimension-input">
+                            <span>Padding horizontal (px)</span>
+                            <input type="number" id="rotasConfigPaddingH" value="12" min="0" max="32">
+                        </label>
+                        <label class="rotas-config-dimension-input">
+                            <span>Raio da borda (px)</span>
+                            <input type="number" id="rotasConfigRaio" value="8" min="0" max="32">
+                        </label>
+                    </div>
+                </div>
+                <div class="rotas-config-actions">
+                    <button type="button" id="btnSalvarRotasVisual" class="btn-save-rotas-visual">💾 Salvar Configurações Visuais</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card-fields-footer">
+            <button type="button" id="btnCancelarCamposCard">Cancelar</button>
+            <button type="button" id="btnSalvarCamposCard" class="btn-save-fields">Salvar</button>
+        </div>
+    </div>
+</div>
+
+<div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+<!-- Modal: Opcoes de Rota -->
+<div id="rotasOpcoesModal" class="card-fields-modal" aria-hidden="true">
+    <div class="card-fields-dialog" role="dialog" aria-modal="true" aria-labelledby="rotasOpcoesTitulo" style="max-width:420px;">
+        <div class="card-fields-header">
+            <strong id="rotasOpcoesTitulo">⚙️ Opções de Rota</strong>
+            <div class="card-fields-actions">
+                <button type="button" id="btnFecharOpcoesRota">Fechar</button>
+            </div>
+        </div>
+        <div style="flex:1; overflow:auto; padding:14px;">
+            <div class="rotas-config-section">
+                <label class="rotas-config-label"><strong>Visibilidade</strong></label>
+                <div class="rotas-config-checkboxes">
+                    <label class="rotas-config-checkbox">
+                        <input type="checkbox" id="rotasConfigMostrarNumero" checked>
+                        <span>Mostrar número da sequência</span>
+                    </label>
+                </div>
+            </div>
+            <div class="rotas-config-section" style="border-top:1px solid #e2e8f0; padding-top:12px; margin-top:8px;">
+                <label class="rotas-config-label"><strong>⚡ Otimização de Rota</strong></label>
+                <div class="rotas-config-checkboxes" style="margin-bottom:10px;">
+                    <label class="rotas-config-checkbox">
+                        <input type="checkbox" id="rotasConfigOtimizBairro">
+                        <span>Agrupar paradas por campos ao otimizar</span>
+                    </label>
+                </div>
+                <div id="campoOtimizBairroWrap" style="display:none; margin-top:4px;">
+                    <label style="font-size:12px; color:#475569; font-weight:600; display:block; margin-bottom:6px;">Hierarquia de agrupamento:</label>
+                    <p style="font-size:11px; color:#64748b; margin:0 0 8px;">Adicione os campos na ordem de prioridade. Ex: 1º Cidade → 2º Bairro.</p>
+                    <div id="otimizCamposPrioridadeLista" style="margin-bottom:8px;"></div>
+                    <div style="display:flex; gap:6px; align-items:center;">
+                        <select id="otimizCampoAddSelect" style="flex:1; padding:5px 8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;">
+                            <option value="">— selecione um campo —</option>
+                        </select>
+                        <button type="button" id="btnOtimizAddCampo" style="padding:5px 12px; background:#0d6efd; color:#fff; border:none; border-radius:6px; font-size:12px; cursor:pointer; white-space:nowrap;">＋ Adicionar</button>
+                    </div>
+                    <p style="font-size:11px; color:#94a3b8; margin-top:6px; margin-bottom:0;">Paradas com mesma combinação de valores ficam agrupadas e próximas na rota.</p>
+                </div>
+            </div>
+            <div class="rotas-config-section" style="border-top:1px solid #e2e8f0; padding-top:12px; margin-top:8px;">
+                <label class="rotas-config-label"><strong>📍 Busca de endereço</strong></label>
+                <p style="font-size:11px; color:#64748b; margin:0 0 8px;">Defina quais campos do SQL serão usados para montar o texto de busca quando uma parada vier sem coordenadas válidas.</p>
+                <div id="buscaEnderecoCamposLista" style="margin-bottom:8px;"></div>
+                <div style="display:flex; gap:6px; align-items:center;">
+                    <select id="buscaEnderecoCampoAddSelect" style="flex:1; padding:5px 8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;">
+                        <option value="">— selecione um campo —</option>
+                    </select>
+                    <button type="button" id="btnBuscaEnderecoAddCampo" style="padding:5px 12px; background:#0d6efd; color:#fff; border:none; border-radius:6px; font-size:12px; cursor:pointer; white-space:nowrap;">＋ Adicionar</button>
+                </div>
+                <p style="font-size:11px; color:#94a3b8; margin-top:6px; margin-bottom:0;">A ordem influencia a qualidade da busca. Ex: Endereço → Número → Bairro → Cidade → Estado → CEP.</p>
+            </div>
+        </div>
+        <div class="card-fields-footer">
+            <button type="button" id="btnCancelarOpcoesRota">Cancelar</button>
+            <button type="button" id="btnSalvarOpcoesRota" class="btn-save-fields">💾 Salvar</button>
+        </div>
+    </div>
+</div>
+
+<div id="importSummaryModal" class="import-summary-modal" aria-hidden="true">
+    <div class="import-summary-dialog" role="dialog" aria-modal="true">
+        <div class="import-summary-header">
+            <strong>Resumo da importação</strong>
+            <button type="button" id="btnFecharImportSummary" class="btn-close-summary" aria-label="Fechar">×</button>
+        </div>
+        <div class="import-summary-body">
+            <p id="importSummaryMessage" class="import-summary-message"></p>
+            <div id="importSummaryListWrap" class="import-summary-list-wrap" style="display:none;">
+                <div class="import-summary-list" id="importSummaryList"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ pedidos_index|json_script:"pedidos-index-data" }}
+{{ campos_exibicao_pedidos|json_script:"campos-exibicao-data" }}
+{{ campos_exibicao_rotas|json_script:"campos-exibicao-rotas-data" }}
+{{ campos_busca_endereco|json_script:"campos-busca-endereco-data" }}
+{{ campos_sql_disponiveis|json_script:"campos-sql-disponiveis-data" }}
+{{ sql_ativo_firebird|json_script:"sql-ativo-firebird-data" }}
+{{ regras_cor_pedidos|json_script:"regras-cor-pedidos-data" }}
+{{ regras_cor_rotas|json_script:"regras-cor-rotas-data" }}
+{{ query_ativa_id|json_script:"query-ativa-id-data" }}
+{{ auto_import_config|json_script:"firebird-auto-import-data" }}
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-routing-machine/3.2.12/leaflet-routing-machine.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+{% if google_maps_key %}
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_key }}&libraries=places"></script>
+{% endif %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const menu = document.getElementById('configMenu');
+    const toggle = document.getElementById('configMenuToggle');
+    if (!menu || !toggle) return;
+
+    toggle.addEventListener('click', function (event) {
+        event.stopPropagation();
+        const isOpen = menu.classList.toggle('open');
+        toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    });
+
+    document.addEventListener('click', function (event) {
+        if (!menu.contains(event.target)) {
+            menu.classList.remove('open');
+            toggle.setAttribute('aria-expanded', 'false');
+        }
+    });
+});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const pedidosEl = document.getElementById('pedidos-index-data');
+    const camposEl = document.getElementById('campos-exibicao-data');
+    const camposRotasEl = document.getElementById('campos-exibicao-rotas-data');
+    const camposBuscaEnderecoEl = document.getElementById('campos-busca-endereco-data');
+    const camposSqlEl = document.getElementById('campos-sql-disponiveis-data');
+    const sqlAtivoEl = document.getElementById('sql-ativo-firebird-data');
+    const regrasCorEl = document.getElementById('regras-cor-pedidos-data');
+    const regrasCorRotasEl = document.getElementById('regras-cor-rotas-data');
+    const queryAtivaIdEl = document.getElementById('query-ativa-id-data');
+    const autoImportEl = document.getElementById('firebird-auto-import-data');
+    const listEl = document.getElementById('pedidosListIndex');
+    const panelEl = document.getElementById('pedidos-panel');
+    const btnTelaCheia = document.getElementById('btnTelaCheiaPedidos');
+    const btnEditarCard = document.getElementById('btnEditarCardPedidos');
+    const btnAbrirRegrasCor = document.getElementById('btnAbrirRegrasCor');
+    const countEl = document.getElementById('pedidosCountIndex');
+    const filterEl = document.getElementById('filterPedidosIndex');
+    const rotasCheckboxListEl = document.getElementById('rotasCheckboxList');
+    const btnRotasTodas = document.getElementById('btnRotasTodas');
+    const btnRotasNenhuma = document.getElementById('btnRotasNenhuma');
+    const btnLimparFiltros = document.getElementById('btnLimparFiltrosPedidos');
+    const btnVisualizarPedidosMapa = document.getElementById('btnVisualizarPedidosMapa');
+    const btnToggleRotas = document.getElementById('btnToggleRotas');
+    const rotasDropdownEl = document.getElementById('rotasDropdown');
+    const rotasFiltroIndicadorEl = document.getElementById('rotasFiltroIndicador');
+    const cardFieldsModalEl = document.getElementById('cardFieldsModal');
+    const cardFieldsDialogEl = cardFieldsModalEl ? cardFieldsModalEl.querySelector('.card-fields-dialog') : null;
+    const cardColorRulesWrapEl = cardFieldsModalEl ? cardFieldsModalEl.querySelector('.card-color-rules') : null;
+    const cardFieldsTitleEl = document.getElementById('cardFieldsTitle');
+    const cardFieldsListEl = document.getElementById('cardFieldsList');
+    const cardFieldsSearchEl = document.getElementById('cardFieldsSearch');
+    const cardColorRulesListEl = document.getElementById('cardColorRulesList');
+    const btnAdicionarRegraCor = document.getElementById('btnAdicionarRegraCor');
+    const btnExpandirModalCard = document.getElementById('btnExpandirModalCard');
+    const btnCamposTodos = document.getElementById('btnCamposTodos');
+    const btnCamposNenhum = document.getElementById('btnCamposNenhum');
+    const btnSalvarCamposCard = document.getElementById('btnSalvarCamposCard');
+    const btnCancelarCamposCard = document.getElementById('btnCancelarCamposCard');
+    const toastContainerEl = document.getElementById('toastContainer');
+    const btnCardTipoPedidos = document.getElementById('btnCardTipoPedidos');
+    const btnCardTipoRotas = document.getElementById('btnCardTipoRotas');
+    const btnRotasOpcoes = document.getElementById('btnRotasOpcoes');
+    const rotasOpcoesModalEl = document.getElementById('rotasOpcoesModal');
+    const btnFecharOpcoesRota = document.getElementById('btnFecharOpcoesRota');
+    const btnCancelarOpcoesRota = document.getElementById('btnCancelarOpcoesRota');
+    const btnSalvarOpcoesRota = document.getElementById('btnSalvarOpcoesRota');
+    const btnConfigRotaCards = document.getElementById('btnConfigRotaCards');
+    const btnImportarAgora = document.getElementById('btnImportarAgora');
+    const importSummaryModalEl = document.getElementById('importSummaryModal');
+    const importSummaryMsgEl = document.getElementById('importSummaryMessage');
+    const importSummaryListWrapEl = document.getElementById('importSummaryListWrap');
+    const importSummaryListEl = document.getElementById('importSummaryList');
+    const btnFecharImportSummary = document.getElementById('btnFecharImportSummary');
+    const importarPedidosUrl = "{% url 'rotas:importar_pedidos_async' %}";
+    const arquivarPedidoBaseUrl = "{% url 'rotas:arquivar_pedido' pk=0 %}".replace('0/arquivar/', '');
+    const autoImportConfig = autoImportEl ? JSON.parse(autoImportEl.textContent || '{}') : {};
+    let modalCardMode = 'full';
+    let currentCardType = 'pedidos'; // 'pedidos' ou 'rotas'
+    let pedidosFiltradosAtuais = [];
+    let pedidosLayerGroup = null;
+    let visualizacaoPedidosAtiva = false;
+    let mapViewBeforePedidos = null;
+    let importandoPedidos = false;
+    let autoImportTimer = null;
+    let mostrAndoArquivados = false;
+
+    if (!pedidosEl || !camposEl || !listEl) return;
+
+    const pedidos = JSON.parse(pedidosEl.textContent || '[]');
+    const campos = JSON.parse(camposEl.textContent || '[]');
+    const camposRotas = camposRotasEl ? JSON.parse(camposRotasEl.textContent || '[]') : [];
+    let camposSql = camposSqlEl ? JSON.parse(camposSqlEl.textContent || '[]') : [];
+    let camposBuscaEndereco = camposBuscaEnderecoEl ? JSON.parse(camposBuscaEnderecoEl.textContent || '[]') : [];
+    let sqlAtivo = sqlAtivoEl ? JSON.parse(sqlAtivoEl.textContent || '""') : '';
+    const regrasCorIniciais = regrasCorEl ? JSON.parse(regrasCorEl.textContent || '[]') : [];
+    const regrasCorRotasIniciais = regrasCorRotasEl ? JSON.parse(regrasCorRotasEl.textContent || '[]') : [];
+    const queryAtivaId = queryAtivaIdEl ? JSON.parse(queryAtivaIdEl.textContent || 'null') : null;
+    const salvarCamposCardUrl = "{% url 'rotas:salvar_campos_card_index' %}";
+    const salvarBuscaEnderecoUrl = "{% url 'rotas:salvar_config_busca_endereco' %}";
+    const MODAL_SIZE_STORAGE_KEY = 'fermap_modal_card_size_v1';
+    const MODAL_MAX_STORAGE_KEY = 'fermap_modal_card_max_v1';
+    window.FERMAP_CSRF_TOKEN = '{{ csrf_token|escapejs }}';
+
+    function getCsrfToken() {
+        const directToken = String(window.FERMAP_CSRF_TOKEN || '').trim();
+        if (/^[A-Za-z0-9]{32,64}$/.test(directToken)) return directToken;
+
+        const cookieToken = document.cookie
+            .split('; ')
+            .find(row => row.startsWith('csrftoken='));
+        const parsedCookieToken = cookieToken ? decodeURIComponent(cookieToken.split('=')[1]).trim() : '';
+        if (/^[A-Za-z0-9]{32,64}$/.test(parsedCookieToken)) return parsedCookieToken;
+
+        return '';
+    }
+
+    function showToast(message, type = 'success') {
+        if (!toastContainerEl) return;
+        const item = document.createElement('div');
+        item.className = `toast-item ${type}`;
+        item.textContent = message;
+        toastContainerEl.appendChild(item);
+
+        requestAnimationFrame(() => item.classList.add('show'));
+
+        setTimeout(() => {
+            item.classList.remove('show');
+            setTimeout(() => item.remove(), 220);
+        }, 2600);
+    }
+    window.showToast = showToast;
+
+    function normalizeBuscaEnderecoCampos(campos) {
+        if (!Array.isArray(campos)) return [];
+        const vistos = new Set();
+        return campos
+            .map(campo => String(campo || '').trim())
+            .filter(campo => campo && !vistos.has(campo.toLowerCase()) && (vistos.add(campo.toLowerCase()), true));
+    }
+
+    function renderBuscaEnderecoCamposLista() {
+        const listaEl = document.getElementById('buscaEnderecoCamposLista');
+        if (!listaEl) return;
+        if (!camposBuscaEndereco.length) {
+            listaEl.innerHTML = '<p style="font-size:11px; color:#94a3b8; font-style:italic; margin:0 0 4px;">Nenhum campo configurado ainda.</p>';
+            return;
+        }
+        listaEl.innerHTML = camposBuscaEndereco.map(function(campo, index) {
+            return '<div class="busca-endereco-prio-item" data-campo="' + campo.replace(/"/g,'&quot;') + '" '
+                + 'style="display:flex; align-items:center; gap:6px; padding:5px 8px; margin-bottom:4px; '
+                + 'background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; font-size:12px;">'
+                + '<span style="min-width:18px; height:18px; background:#0f766e; color:#fff; border-radius:50%; font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center;">' + (index + 1) + '</span>'
+                + '<span style="flex:1; font-weight:500;">' + campo + '</span>'
+                + (index > 0
+                    ? '<button type="button" class="busca-endereco-up" data-idx="' + index + '" style="background:none; border:1px solid #cbd5e1; border-radius:4px; padding:1px 5px; cursor:pointer; font-size:11px;" title="Mover para cima">▲</button>'
+                    : '<span style="width:26px;"></span>')
+                + (index < camposBuscaEndereco.length - 1
+                    ? '<button type="button" class="busca-endereco-down" data-idx="' + index + '" style="background:none; border:1px solid #cbd5e1; border-radius:4px; padding:1px 5px; cursor:pointer; font-size:11px;" title="Mover para baixo">▼</button>'
+                    : '<span style="width:26px;"></span>')
+                + '<button type="button" class="busca-endereco-remove" data-idx="' + index + '" style="background:none; border:1px solid #fca5a5; border-radius:4px; padding:1px 6px; cursor:pointer; font-size:11px; color:#ef4444;" title="Remover">×</button>'
+                + '</div>';
+        }).join('');
+    }
+
+    function popularSelectBuscaEndereco() {
+        const select = document.getElementById('buscaEnderecoCampoAddSelect');
+        if (!select) return;
+        const todosOsCampos = (window._fermap_campos_sql || camposSql || []).slice().sort(function(a, b) { return a.localeCompare(b, 'pt-BR'); });
+        select.innerHTML = '<option value="">— selecione um campo —</option>';
+        todosOsCampos.forEach(function(campo) {
+            if (camposBuscaEndereco.indexOf(campo) !== -1) return;
+            const option = document.createElement('option');
+            option.value = campo;
+            option.textContent = campo;
+            select.appendChild(option);
+        });
+        renderBuscaEnderecoCamposLista();
+    }
+
+    function carregarConfiguracaoBuscaEndereco() {
+        const current = window.routeAddressSearchConfig && Array.isArray(window.routeAddressSearchConfig.fields)
+            ? window.routeAddressSearchConfig.fields
+            : camposBuscaEndereco;
+        camposBuscaEndereco = normalizeBuscaEnderecoCampos(current);
+        popularSelectBuscaEndereco();
+    }
+
+    async function salvarConfiguracaoBuscaEndereco(silent = false) {
+        const response = await fetch(salvarBuscaEnderecoUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken()
+            },
+            body: JSON.stringify({
+                campos: camposBuscaEndereco,
+                sql_ativo: sqlAtivo
+            })
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            if (!silent) showToast(data.message || 'Erro ao salvar configuração da busca de endereço.', 'error');
+            throw new Error(data.message || 'Erro ao salvar configuração da busca de endereço.');
+        }
+
+        camposBuscaEndereco = normalizeBuscaEnderecoCampos(data.campos || []);
+        window.routeAddressSearchConfig = { fields: camposBuscaEndereco.slice() };
+        if (!silent) showToast('✅ Configuração da busca de endereço salva!', 'success');
+        return true;
+    }
+
+    function setImportButtonState(loading) {
+        if (!btnImportarAgora) return;
+        if (loading) {
+            btnImportarAgora.dataset.originalText = btnImportarAgora.textContent;
+            btnImportarAgora.textContent = 'Importando...';
+            btnImportarAgora.disabled = true;
+            btnImportarAgora.classList.add('is-loading');
+        } else {
+            btnImportarAgora.textContent = btnImportarAgora.dataset.originalText || '⚡ Importar Agora';
+            btnImportarAgora.disabled = false;
+            btnImportarAgora.classList.remove('is-loading');
+        }
+    }
+
+    function renderImportSummary(data) {
+        if (!importSummaryModalEl || !importSummaryMsgEl || !importSummaryListWrapEl || !importSummaryListEl) return;
+
+        const novos = Array.isArray(data?.novos) ? data.novos : [];
+        const criados = Number(data?.criados || 0);
+        const atualizados = Number(data?.atualizados || 0);
+
+        const tituloMsg = criados > 0
+            ? `Foram encontrados ${criados} novo(s) pedido(s) e ${atualizados} atualizado(s).`
+            : 'Nenhum pedido novo localizado.';
+
+        importSummaryMsgEl.textContent = tituloMsg;
+
+        if (novos.length) {
+            importSummaryListWrapEl.style.display = 'block';
+            importSummaryListEl.innerHTML = novos.map(item => {
+                const numero = item.numero_pedido ? `#${item.numero_pedido}` : '—';
+                const cliente = item.cliente_nome || 'Sem cliente';
+                const endereco = item.endereco || 'Sem endereço';
+                return `
+                    <div class="import-summary-item">
+                        <div class="titulo">${numero} • ${cliente}</div>
+                        <div class="detalhe">${endereco}</div>
+                    </div>
+                `;
+            }).join('');
+        } else {
+            importSummaryListWrapEl.style.display = 'none';
+            importSummaryListEl.innerHTML = '';
+        }
+
+        importSummaryModalEl.classList.add('is-open');
+        importSummaryModalEl.setAttribute('aria-hidden', 'false');
+    }
+
+    async function importarPedidos(options = {}) {
+        const viaAuto = Boolean(options.viaAuto);
+        if (importandoPedidos) return;
+        importandoPedidos = true;
+
+        if (!viaAuto) {
+            setImportButtonState(true);
+        }
+
+        try {
+            const response = await fetch(importarPedidosUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken(),
+                },
+                body: JSON.stringify({ query_id: queryAtivaId })
+            });
+
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                showToast(data.message || 'Erro ao importar pedidos.', 'error');
+                return;
+            }
+
+            const criados = data.criados || 0;
+            const atualizados = data.atualizados || 0;
+
+            if (viaAuto) {
+                if (criados > 0 || atualizados > 0) {
+                    showToast(`Importação automática: ${criados} novos, ${atualizados} atualizados.`, 'success');
+                }
+                return;
+            }
+
+            renderImportSummary(data);
+            showToast(data.message || 'Importação concluída.', 'success');
+        } catch (error) {
+            showToast('Erro ao importar: ' + (error?.message || error), 'error');
+        } finally {
+            importandoPedidos = false;
+            if (!viaAuto) {
+                setImportButtonState(false);
+            }
+        }
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function parseCoordNumber(value) {
+        if (value === null || value === undefined || value === '') return null;
+        const normalized = typeof value === 'string' ? value.replace(',', '.').trim() : value;
+        const numero = Number(normalized);
+        return Number.isNaN(numero) ? null : numero;
+    }
+
+    function obterLatLngPedido(pedido) {
+        if (!pedido) return null;
+        const dados = pedido.dados_json || {};
+        const candidatosLat = [pedido.latitude, dados.latitude, dados.Latitude, dados.LATITUDE];
+        const candidatosLng = [pedido.longitude, dados.longitude, dados.Longitude, dados.LONGITUDE];
+        const lat = candidatosLat.map(parseCoordNumber).find(valor => valor !== null && valor !== undefined);
+        const lng = candidatosLng.map(parseCoordNumber).find(valor => valor !== null && valor !== undefined);
+        if (lat === null || lat === undefined || lng === null || lng === undefined) {
+            return null;
+        }
+        return { lat, lng };
+    }
+
+    function pedidoTemCoordenadas(pedido) {
+        return !!obterLatLngPedido(pedido);
+    }
+
+    function focarStopsAtuais() {
+        if (typeof map === 'undefined' || !map || !Array.isArray(window.stops) || !window.stops.length) {
+            return false;
+        }
+        const coordsValidas = window.stops
+            .map(stop => Array.isArray(stop.coords) ? stop.coords : [stop.lat, stop.lng])
+            .filter(pair => Array.isArray(pair) && pair.length === 2 && pair.every(num => typeof num === 'number'));
+        if (!coordsValidas.length) {
+            return false;
+        }
+        const bounds = L.latLngBounds(coordsValidas);
+        if (!bounds.isValid()) {
+            return false;
+        }
+        map.fitBounds(bounds, { padding: [40, 40] });
+        return true;
+    }
+
+    function restaurarVisaoPadraoMapa() {
+        if (focarStopsAtuais()) {
+            mapViewBeforePedidos = null;
+            return;
+        }
+        if (typeof map !== 'undefined' && map && mapViewBeforePedidos && mapViewBeforePedidos.center) {
+            map.setView(mapViewBeforePedidos.center, mapViewBeforePedidos.zoom);
+        }
+        mapViewBeforePedidos = null;
+    }
+
+    function atualizarVisualizacaoPedidos(refitMapa = false) {
+        if (!visualizacaoPedidosAtiva || typeof map === 'undefined' || !map) return;
+        const pedidosValidos = pedidosFiltradosAtuais
+            .map(pedido => ({ pedido, coords: obterLatLngPedido(pedido) }))
+            .filter(item => item.coords);
+
+        if (!pedidosValidos.length) {
+            desativarVisualizacaoPedidos(false);
+            showToast('Nenhum pedido filtrado possui coordenadas para exibir.', 'error');
+            return;
+        }
+
+        if (!pedidosLayerGroup) {
+            pedidosLayerGroup = L.layerGroup().addTo(map);
+        } else {
+            pedidosLayerGroup.clearLayers();
+        }
+
+        pedidosValidos.forEach(item => {
+            const marker = L.circleMarker([item.coords.lat, item.coords.lng], {
+                radius: 7,
+                color: '#0f172a',
+                weight: 2,
+                fillColor: '#10b981',
+                fillOpacity: 0.85
+            });
+            const popup = `#${escapeHtml(item.pedido.numero_pedido || String(item.pedido.id || '—'))}<br>` +
+                `${escapeHtml(item.pedido.cliente_nome || 'Sem cliente')}<br>` +
+                `${escapeHtml(item.pedido.endereco || 'Sem endereço')}`;
+            marker.bindPopup(popup);
+            marker.addTo(pedidosLayerGroup);
+        });
+
+        if (refitMapa) {
+            const bounds = L.latLngBounds(pedidosValidos.map(item => [item.coords.lat, item.coords.lng]));
+            if (bounds.isValid()) {
+                map.fitBounds(bounds, { padding: [50, 50] });
+            }
+        }
+    }
+
+    function ativarVisualizacaoPedidos() {
+        if (visualizacaoPedidosAtiva) {
+            atualizarVisualizacaoPedidos(true);
+            return;
+        }
+
+        if (typeof map === 'undefined' || !map) {
+            showToast('Mapa ainda não carregou. Tente novamente em instantes.', 'error');
+            return;
+        }
+
+        if (!pedidosFiltradosAtuais.length) {
+            showToast('Nenhum pedido disponível após os filtros atuais.', 'info');
+            return;
+        }
+
+        mapViewBeforePedidos = { center: map.getCenter(), zoom: map.getZoom() };
+        visualizacaoPedidosAtiva = true;
+        if (btnVisualizarPedidosMapa) {
+            btnVisualizarPedidosMapa.classList.add('is-active');
+            btnVisualizarPedidosMapa.textContent = '↩️ Voltar para rota';
+        }
+
+        const semCoordenadas = pedidosFiltradosAtuais.filter(p => !pedidoTemCoordenadas(p)).length;
+        if (semCoordenadas > 0) {
+            showToast(`${semCoordenadas} pedido(s) ignorado(s) por falta de coordenadas.`, 'info');
+        }
+
+        atualizarVisualizacaoPedidos(true);
+    }
+
+    function desativarVisualizacaoPedidos(showFeedback = false) {
+        if (pedidosLayerGroup && typeof map !== 'undefined' && map) {
+            map.removeLayer(pedidosLayerGroup);
+        }
+        if (pedidosLayerGroup) {
+            pedidosLayerGroup.clearLayers();
+            pedidosLayerGroup = null;
+        }
+        visualizacaoPedidosAtiva = false;
+        if (btnVisualizarPedidosMapa) {
+            btnVisualizarPedidosMapa.classList.remove('is-active');
+            btnVisualizarPedidosMapa.textContent = '👁️ Ver no mapa';
+        }
+        if (showFeedback) {
+            showToast('Visualização temporária removida.', 'info');
+        }
+        restaurarVisaoPadraoMapa();
+    }
+
+    window.desativarVisualizacaoPedidos = desativarVisualizacaoPedidos;
+
+    function isModalMaximized() {
+        return !!(cardFieldsDialogEl && cardFieldsDialogEl.classList.contains('maximized'));
+    }
+
+    function updateExpandButtonUI() {
+        if (!btnExpandirModalCard) return;
+        const expanded = isModalMaximized();
+        btnExpandirModalCard.classList.toggle('is-active', expanded);
+        btnExpandirModalCard.textContent = expanded ? 'Recolher' : 'Expandir';
+    }
+
+    function saveModalSizeState() {
+        if (!cardFieldsDialogEl || isModalMaximized()) return;
+        const payload = {
+            width: cardFieldsDialogEl.offsetWidth,
+            height: cardFieldsDialogEl.offsetHeight,
+        };
+        localStorage.setItem(MODAL_SIZE_STORAGE_KEY, JSON.stringify(payload));
+    }
+
+    function applyModalSizeState() {
+        if (!cardFieldsDialogEl) return;
+        const maximized = localStorage.getItem(MODAL_MAX_STORAGE_KEY) === '1';
+        cardFieldsDialogEl.classList.toggle('maximized', maximized);
+
+        if (!maximized) {
+            const raw = localStorage.getItem(MODAL_SIZE_STORAGE_KEY);
+            if (raw) {
+                try {
+                    const saved = JSON.parse(raw);
+                    const width = Number(saved.width);
+                    const height = Number(saved.height);
+                    if (!Number.isNaN(width) && width > 520) {
+                        cardFieldsDialogEl.style.width = `${Math.min(width, Math.floor(window.innerWidth * 0.96))}px`;
+                    }
+                    if (!Number.isNaN(height) && height > 420) {
+                        cardFieldsDialogEl.style.height = `${Math.min(height, Math.floor(window.innerHeight * 0.92))}px`;
+                    }
+                } catch (_e) {
+                }
+            }
+        }
+
+        updateExpandButtonUI();
+    }
+
+    function refreshDraftWithCamposDisponiveis(novosCampos) {
+        const sorted = Array.from(new Set((novosCampos || []).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+        if (!sorted.length) return;
+
+        camposSql = sorted;
+        // Atualiza listas de campos disponíveis para pedidos e rotas (ambas usam SQL)
+        camposDisponiveisPedidos = listarCamposDisponiveis();
+        camposDisponiveisRotas = [...camposDisponiveisPedidos];
+        camposDisponiveis = currentCardType === 'rotas' ? camposDisponiveisRotas : camposDisponiveisPedidos;
+
+        const draftMap = new Map(camposCardDraft.map(item => [item.campo, item]));
+        const ativosMap = new Map(camposCardAtivos.map(item => [item.campo, item]));
+
+        const orderBase = camposCardDraft.map(item => item.campo);
+        const orderedCampos = [
+            ...orderBase.filter(campo => camposDisponiveis.includes(campo)),
+            ...camposDisponiveis.filter(campo => !orderBase.includes(campo)),
+        ];
+
+        camposCardDraft = orderedCampos.map((campo) => {
+            const prior = draftMap.get(campo) || ativosMap.get(campo) || mapaCamposIniciais.get(campo) || defaultsCampo(campo);
+            return {
+                campo,
+                selected: draftMap.has(campo) ? !!draftMap.get(campo).selected : ativosMap.has(campo),
+                rotulo: prior.rotulo || campo,
+                icone: prior.icone || '',
+                cor: prior.cor || '',
+                tamanho: prior.tamanho || '',
+                posicao: prior.posicao || 'esquerda',
+                largura: prior.largura || '',
+                altura: prior.altura || '',
+            };
+        });
+
+        renderCamposModal();
+        renderRegrasCorModal();
+    }
+
+    function getFieldValue(pedido, campo) {
+        if (Object.prototype.hasOwnProperty.call(pedido, campo)) {
+            return pedido[campo];
+        }
+        const dados = pedido.dados_json || {};
+        return dados[campo];
+    }
+
+    function normalizeRegraCorConfig(regra, idx = 0) {
+        if (!regra || typeof regra !== 'object') {
+            return {
+                campo: '',
+                operador: 'igual',
+                valor: '',
+                cor_fundo: '',
+                cor_borda: '',
+                cor_texto: '',
+                ativo: true,
+                prioridade: idx + 1,
+            };
+        }
+
+        return {
+            campo: String(regra.campo || '').trim(),
+            operador: String(regra.operador || 'igual').trim() || 'igual',
+            valor: String(regra.valor ?? '').trim(),
+            valor2: String(regra.valor2 ?? '').trim(),
+            cor_fundo: String(regra.cor_fundo || '').trim(),
+            cor_borda: String(regra.cor_borda || '').trim(),
+            cor_texto: String(regra.cor_texto || '').trim(),
+            espessura_borda: (regra.espessura_borda !== undefined && regra.espessura_borda !== '') ? Number(regra.espessura_borda) : '',
+            ativo: regra.ativo !== false,
+            prioridade: Number(regra.prioridade) > 0 ? Number(regra.prioridade) : (idx + 1),
+        };
+    }
+
+    function tryParseNumber(value) {
+        if (value === null || value === undefined) return null;
+        const normalized = String(value).trim().replace(',', '.');
+        if (!normalized) return null;
+        const number = Number(normalized);
+        return Number.isNaN(number) ? null : number;
+    }
+
+    /**
+     * Converte string de data dd/mm/aaaa, yyyy-mm-dd ou ISO 8601 em objeto Date (meia-noite local).
+     * Retorna null se nao conseguir fazer o parse.
+     */
+    function parseDateStrJS(str) {
+        if (!str) return null;
+        const s = String(str).trim();
+        // dd/mm/aaaa ou dd/mm/aa
+        const dmY = s.match(/^(\d{2})\/(\d{2})\/(\d{2,4})$/);
+        if (dmY) {
+            let ano = parseInt(dmY[3], 10);
+            if (ano < 100) ano += 2000;
+            const d = new Date(ano, parseInt(dmY[2], 10) - 1, parseInt(dmY[1], 10));
+            return isNaN(d.getTime()) ? null : d;
+        }
+        // yyyy-mm-dd (com ou sem hora)
+        const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (iso) {
+            const d = new Date(parseInt(iso[1], 10), parseInt(iso[2], 10) - 1, parseInt(iso[3], 10));
+            return isNaN(d.getTime()) ? null : d;
+        }
+        return null;
+    }
+
+    /**
+     * Converte string de data/hora em objeto Date (preservando hora local).
+     * Retorna null se nao conseguir.
+     */
+    function parseDateTimeStrJS(str) {
+        if (!str) return null;
+        const s = String(str).trim();
+        // dd/mm/aaaa HH:MM:SS ou dd/mm/aaaa HH:MM
+        const dmYh = s.match(/^(\d{2})\/(\d{2})\/(\d{2,4})[T ]?(\d{2}):(\d{2})(?::(\d{2}))?/);
+        if (dmYh) {
+            let ano = parseInt(dmYh[3], 10);
+            if (ano < 100) ano += 2000;
+            const d = new Date(ano, parseInt(dmYh[2], 10) - 1, parseInt(dmYh[1], 10),
+                parseInt(dmYh[4], 10), parseInt(dmYh[5], 10), parseInt(dmYh[6] || '0', 10));
+            return isNaN(d.getTime()) ? null : d;
+        }
+        // yyyy-mm-ddTHH:MM:SS ou yyyy-mm-dd HH:MM
+        const isoH = s.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/);
+        if (isoH) {
+            const d = new Date(parseInt(isoH[1], 10), parseInt(isoH[2], 10) - 1, parseInt(isoH[3], 10),
+                parseInt(isoH[4], 10), parseInt(isoH[5], 10), parseInt(isoH[6] || '0', 10));
+            return isNaN(d.getTime()) ? null : d;
+        }
+        // Fallback: tentar apenas a data
+        return parseDateStrJS(str);
+    }
+
+    /** Diferenca em dias inteiros entre hoje e a data do campo (positivo = passado). */
+    function diffDaysFromToday(str) {
+        const d = parseDateStrJS(str);
+        if (d === null) return null;
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+        d.setHours(0, 0, 0, 0);
+        return Math.floor((hoje - d) / 86400000);
+    }
+
+    /** Diferenca em horas (decimal) entre agora e o datetime do campo (positivo = passado). */
+    function diffHoursFromNow(str) {
+        const d = parseDateTimeStrJS(str);
+        if (d === null) return null;
+        return (Date.now() - d.getTime()) / 3600000;
+    }
+
+    function regraCorCombina(rule, pedido) {
+        const raw = getFieldValue(pedido, rule.campo);
+        const atual = raw === null || raw === undefined ? '' : String(raw).trim();
+        const alvo = String(rule.valor || '').trim();
+        const atualLower = atual.toLowerCase();
+        const alvoLower = alvo.toLowerCase();
+        const nAtual = tryParseNumber(atual);
+        const nAlvo = tryParseNumber(alvo);
+
+        switch (rule.operador) {
+            case 'igual':
+                return atualLower === alvoLower;
+            case 'diferente':
+                return atualLower !== alvoLower;
+            case 'contem':
+                return !!alvoLower && atualLower.includes(alvoLower);
+            case 'nao_contem':
+                return !!alvoLower && !atualLower.includes(alvoLower);
+            case 'maior':
+                return nAtual !== null && nAlvo !== null && nAtual > nAlvo;
+            case 'maior_igual':
+                return nAtual !== null && nAlvo !== null && nAtual >= nAlvo;
+            case 'menor':
+                return nAtual !== null && nAlvo !== null && nAtual < nAlvo;
+            case 'menor_igual':
+                return nAtual !== null && nAlvo !== null && nAtual <= nAlvo;
+            case 'vazio':
+                return atual === '';
+            case 'nao_vazio':
+                return atual !== '';
+            case 'dias_maior': {
+                const dd = diffDaysFromToday(atual);
+                const ref = parseFloat(alvo);
+                return dd !== null && !isNaN(ref) && dd > ref;
+            }
+            case 'dias_menor': {
+                const dd = diffDaysFromToday(atual);
+                const ref = parseFloat(alvo);
+                return dd !== null && !isNaN(ref) && dd < ref;
+            }
+            case 'dias_igual': {
+                const dd = diffDaysFromToday(atual);
+                const ref = Math.round(parseFloat(alvo));
+                return dd !== null && !isNaN(ref) && dd === ref;
+            }
+            case 'hoje': {
+                const dd = diffDaysFromToday(atual);
+                return dd !== null && dd === 0;
+            }
+            case 'horas_maior': {
+                const dh = diffHoursFromNow(atual);
+                const ref = parseFloat(alvo);
+                return dh !== null && !isNaN(ref) && dh > ref;
+            }
+            case 'horas_menor': {
+                const dh = diffHoursFromNow(atual);
+                const ref = parseFloat(alvo);
+                return dh !== null && !isNaN(ref) && dh < ref;
+            }
+            case 'dias_entre': {
+                const dd = diffDaysFromToday(atual);
+                const min = Math.round(parseFloat(alvo));
+                const max = Math.round(parseFloat(String(rule.valor2 || '')));
+                return dd !== null && !isNaN(min) && !isNaN(max) && dd >= min && dd <= max;
+            }
+            default:
+                return false;
+        }
+    }
+
+    function getRegraCorAplicada(pedido) {
+        const ativasOrdenadas = regrasCorAtivas
+            .filter(rule => rule.ativo && rule.campo)
+            .sort((a, b) => (a.prioridade || 9999) - (b.prioridade || 9999));
+
+        return ativasOrdenadas.find(rule => regraCorCombina(rule, pedido)) || null;
+    }
+
+    function getRotaPedido(pedido) {
+        const dados = pedido.dados_json || {};
+        const candidatos = [
+            pedido.entregador,
+            dados['Rota'], dados['rota'],
+            dados['Regiao'], dados['REGIAO'], dados['regiao'],
+            dados['Nome vendedor'], dados['NOME VENDEDOR'], dados['nome vendedor'],
+            dados['Entregador'], dados['ENTREGADOR'],
+        ];
+        const valor = candidatos.find(v => v !== null && v !== undefined && String(v).trim() !== '');
+        return valor ? String(valor).trim() : 'Sem rota';
+    }
+
+    function normalizeCampoConfig(cfg) {
+        if (typeof cfg === 'string') {
+            return { campo: cfg, rotulo: cfg, icone: '', cor: '', tamanho: '' };
+        }
+        if (cfg && typeof cfg === 'object') {
+            const campo = String(cfg.campo || '').trim();
+            return {
+                campo,
+                rotulo: String(cfg.rotulo || campo || '').trim(),
+                icone: String(cfg.icone || '').trim(),
+                cor: String(cfg.cor || '').trim(),
+                tamanho: String(cfg.tamanho || '').trim(),
+            };
+        }
+        return { campo: '', rotulo: '', icone: '', cor: '', tamanho: '' };
+    }
+
+    function parseSqlAliases(sqlText) {
+        if (!sqlText) return [];
+        const aliases = [];
+        const quotedMatches = [...sqlText.matchAll(/\bAS\s+"([^"]+)"/gi)];
+        quotedMatches.forEach(match => {
+            const value = String(match[1] || '').trim();
+            if (value) aliases.push(value);
+        });
+
+        const plainMatches = [...sqlText.matchAll(/\bAS\s+([A-Za-z_][A-Za-z0-9_]*)/gi)];
+        plainMatches.forEach(match => {
+            const value = String(match[1] || '').trim();
+            if (value) aliases.push(value);
+        });
+
+        const unique = [];
+        const seen = new Set();
+        aliases.forEach((alias) => {
+            const key = alias.toLowerCase();
+            if (seen.has(key)) return;
+            seen.add(key);
+            unique.push(alias);
+        });
+        return unique;
+    }
+
+    function listarCamposDisponiveis() {
+        // Preferir sempre os aliases/colunas vindas do SQL ativo
+        if (Array.isArray(camposSql) && camposSql.length) {
+            return Array.from(new Set(camposSql)).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+        }
+
+        // Fallback: extrair dos pedidos/dados_json (mantém compatibilidade)
+        const blocked = new Set(['id', 'dados_json', 'inRoute']);
+        const camposSet = new Set();
+
+        pedidos.forEach((pedido) => {
+            Object.keys(pedido || {}).forEach((key) => {
+                if (!blocked.has(key)) camposSet.add(key);
+            });
+            const dados = pedido && pedido.dados_json ? pedido.dados_json : {};
+            Object.keys(dados).forEach((key) => {
+                if (key && String(key).trim()) camposSet.add(String(key).trim());
+            });
+        });
+
+        return Array.from(camposSet).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    }
+
+    const mapaCamposIniciais = new Map(campos.map(normalizeCampoConfig).filter(c => c.campo).map(c => [c.campo, c]));
+    const mapaCamposIniciaisRotas = new Map(camposRotas.map(normalizeCampoConfig).filter(c => c.campo).map(c => [c.campo, c]));
+    
+    // Campos disponíveis são obtidos do SQL/preview (mesma lista para pedidos e rotas)
+    let camposDisponiveisPedidos = listarCamposDisponiveis();
+    let camposDisponiveisRotas = [...camposDisponiveisPedidos];
+    
+    // Variável que aponta para a lista ativa baseada no tipo de card atual
+    let camposDisponiveis = camposDisponiveisPedidos;
+
+    function defaultsCampo(campo) {
+        // Defaults específicos para campos de rota
+        if (currentCardType === 'rotas') {
+            const rotasDefaults = {
+                'numero': { rotulo: 'Número', icone: '🔢', cor: '', tamanho: '', posicao: 'esquerda', largura: '', altura: '' },
+                'nome': { rotulo: 'Nome do Cliente', icone: '👤', cor: '', tamanho: '', posicao: 'esquerda', largura: '', altura: '' },
+                'endereco': { rotulo: 'Endereço', icone: '📍', cor: '', tamanho: '', posicao: 'esquerda', largura: '', altura: '' },
+                'observacoes': { rotulo: 'Observações', icone: '📝', cor: '', tamanho: '', posicao: 'esquerda', largura: '', altura: '' }
+            };
+            
+            if (rotasDefaults[campo]) {
+                return { campo, ...rotasDefaults[campo] };
+            }
+        }
+        
+        return {
+            campo,
+            rotulo: campo,
+            icone: '',
+            cor: '',
+            tamanho: '',
+            posicao: 'esquerda',
+            largura: '',
+            altura: '',
+        };
+    }
+
+    function carregarCamposCard() {
+        const baseSelecionados = campos.map(normalizeCampoConfig).filter(c => c.campo);
+        const unicosMap = new Map();
+        baseSelecionados.forEach((cfg) => {
+            if (camposDisponiveis.includes(cfg.campo) && !unicosMap.has(cfg.campo)) {
+                unicosMap.set(cfg.campo, { ...defaultsCampo(cfg.campo), ...cfg });
+            }
+        });
+        return Array.from(unicosMap.values());
+    }
+
+    let camposCardAtivos = carregarCamposCard();
+    let camposCardDraft = [];
+    let regrasCorPedidos = Array.isArray(regrasCorIniciais)
+        ? regrasCorIniciais.map((rule, idx) => normalizeRegraCorConfig(rule, idx))
+        : [];
+    let regrasCorRotas = Array.isArray(regrasCorRotasIniciais)
+        ? regrasCorRotasIniciais.map((rule, idx) => normalizeRegraCorConfig(rule, idx))
+        : [];
+    let regrasCorAtivas = currentCardType === 'rotas' ? [...regrasCorRotas] : [...regrasCorPedidos];
+    let regrasCorDraft = [];
+
+    function renderRegrasCorModal() {
+        if (!cardColorRulesListEl) return;
+
+        if (!regrasCorDraft.length) {
+            cardColorRulesListEl.innerHTML = '<div class="card-color-rules-empty">Nenhuma regra cadastrada.</div>';
+            return;
+        }
+
+        const SEM_VALOR_OPERADORES = new Set(['vazio', 'nao_vazio', 'hoje']);
+
+        const operadores = [
+            { value: 'igual', label: 'Igual a' },
+            { value: 'diferente', label: 'Diferente de' },
+            { value: 'contem', label: 'Contém' },
+            { value: 'nao_contem', label: 'Não contém' },
+            { value: 'maior', label: 'Maior que' },
+            { value: 'maior_igual', label: 'Maior ou igual' },
+            { value: 'menor', label: 'Menor que' },
+            { value: 'menor_igual', label: 'Menor ou igual' },
+            { value: 'vazio', label: 'Está vazio' },
+            { value: 'nao_vazio', label: 'Não está vazio' },
+            // ─── Operadores temporais ───────────────────────────────────
+            { value: 'hoje', label: '📅 É hoje' },
+            { value: 'dias_maior', label: '📅 Dias maior que' },
+            { value: 'dias_menor', label: '📅 Dias menor que' },
+            { value: 'dias_igual', label: '📅 Dias igual a' },
+            { value: 'dias_entre', label: '📅 Entre X e Y dias' },
+            { value: 'horas_maior', label: '⏱ Horas maior que' },
+            { value: 'horas_menor', label: '⏱ Horas menor que' },
+        ];
+
+        cardColorRulesListEl.innerHTML = regrasCorDraft.map((rule, index) => {
+            const camposOpcoes = Array.from(new Set([rule.campo, ...camposDisponiveis].filter(Boolean)));
+            const optionsCampo = camposOpcoes
+                .map((campo) => `<option value="${escapeHtml(campo)}" ${campo === rule.campo ? 'selected' : ''}>${escapeHtml(campo)}</option>`)
+                .join('');
+            const optionsOperador = operadores
+                .map((op) => `<option value="${op.value}" ${op.value === rule.operador ? 'selected' : ''}>${op.label}</option>`)
+                .join('');
+
+            return `
+                <div class="card-color-rule-item" data-rule-idx="${index}">
+                    <div class="card-color-rule-head">
+                        <input type="checkbox" data-rk="ativo" ${rule.ativo ? 'checked' : ''} title="Ativa">
+                        <b>#${index + 1}</b>
+                        <span>Quando</span>
+                        <div class="card-color-rule-order">
+                            <button type="button" data-rule-action="up" ${index === 0 ? 'disabled' : ''}>↑</button>
+                            <button type="button" data-rule-action="down" ${index >= regrasCorDraft.length - 1 ? 'disabled' : ''}>↓</button>
+                            <button type="button" class="btn-remover-regra-cor" data-rule-action="remove" title="Remover">×</button>
+                        </div>
+                    </div>
+                    <div class="card-color-rule-labels">
+                        <span>Campo</span>
+                        <span>Operador</span>
+                        <span>${rule.operador === 'dias_entre' ? 'De / Até (dias)' : 'Valor'}</span>
+                        <span title="Espessura da borda (px)">Esp.</span>
+                        <span>Cor Fundo</span>
+                        <span>Cor Borda</span>
+                        <span>Cor Texto</span>
+                    </div>
+                    <div class="card-color-rule-grid">
+                        <select data-rk="campo">${optionsCampo}</select>
+                        <select data-rk="operador">${optionsOperador}</select>
+                        ${rule.operador === 'dias_entre'
+                            ? `<div class="rule-valor-entre">
+                                <input type="number" data-rk="valor" value="${escapeHtml(rule.valor || '')}" placeholder="De" min="0" title="Mínimo de dias">
+                                <span>—</span>
+                                <input type="number" data-rk="valor2" value="${escapeHtml(rule.valor2 || '')}" placeholder="Até" min="0" title="Máximo de dias">
+                               </div>`
+                            : SEM_VALOR_OPERADORES.has(rule.operador)
+                                ? `<input type="text" data-rk="valor" disabled placeholder="(sem valor)" style="background:#f1f5f9;color:#94a3b8;">`
+                                : `<input type="text" data-rk="valor" value="${escapeHtml(rule.valor || '')}" placeholder="Valor comparado">`
+                        }
+                        <input type="number" data-rk="espessura_borda" value="${rule.espessura_borda !== undefined && rule.espessura_borda !== '' ? rule.espessura_borda : ''}" min="0" max="20" placeholder="px" title="Espessura da borda em pixels" style="text-align:center;">
+                        <div class="color-input-wrapper">
+                            <input type="color" data-rk="cor_fundo" value="${rule.cor_fundo || '#ffffff'}" title="Cor de fundo">
+                            <button type="button" class="btn-palette-open" data-palette-field="cor_fundo" title="Paleta de cores">🎨</button>
+                            <button type="button" class="btn-reset-color" data-reset-color="cor_fundo" title="Limpar cor de fundo">×</button>
+                        </div>
+                        <div class="color-input-wrapper">
+                            <input type="color" data-rk="cor_borda" value="${rule.cor_borda || '#dfe3e8'}" title="Cor da borda">
+                            <button type="button" class="btn-palette-open" data-palette-field="cor_borda" title="Paleta de cores">🎨</button>
+                            <button type="button" class="btn-reset-color" data-reset-color="cor_borda" title="Limpar cor de borda">×</button>
+                        </div>
+                        <div class="color-input-wrapper">
+                            <input type="color" data-rk="cor_texto" value="${rule.cor_texto || '#000000'}" title="Cor do texto">
+                            <button type="button" class="btn-palette-open" data-palette-field="cor_texto" title="Paleta de cores">🎨</button>
+                            <button type="button" class="btn-reset-color" data-reset-color="cor_texto" title="Limpar cor de texto">×</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function renderCamposModal() {
+        if (!cardFieldsListEl) return;
+
+        const query = cardFieldsSearchEl ? cardFieldsSearchEl.value.toLowerCase().trim() : '';
+        const fonte = camposCardDraft.filter(item => !query || item.campo.toLowerCase().includes(query));
+
+        if (!fonte.length) {
+            cardFieldsListEl.innerHTML = '<div class="card-fields-empty">Nenhum campo encontrado.</div>';
+            return;
+        }
+
+        cardFieldsListEl.innerHTML = fonte.map((item) => `
+            <div class="card-fields-item" data-item-campo="${item.campo}">
+                <div class="card-fields-main">
+                    <input type="checkbox" data-k="selected" ${item.selected ? 'checked' : ''}>
+                    <span class="card-fields-name">${item.campo}</span>
+                    <div class="card-fields-order">
+                        <b>#${camposCardDraft.findIndex(x => x.campo === item.campo) + 1}</b>
+                        <button type="button" data-action="up" ${camposCardDraft.findIndex(x => x.campo === item.campo) <= 0 ? 'disabled' : ''}>↑</button>
+                        <button type="button" data-action="down" ${camposCardDraft.findIndex(x => x.campo === item.campo) >= (camposCardDraft.length - 1) ? 'disabled' : ''}>↓</button>
+                    </div>
+                </div>
+                <div class="card-fields-config">
+                    <input type="text" data-k="rotulo" value="${item.rotulo || ''}" placeholder="Rótulo">
+                    <input type="text" data-k="icone" value="${item.icone || ''}" placeholder="Ícone">
+                    <input type="text" data-k="cor" value="${item.cor || ''}" placeholder="#334155">
+                    <input type="number" data-k="tamanho" value="${item.tamanho || ''}" min="8" max="28" placeholder="Fonte">
+                    <select data-k="posicao">
+                        <option value="esquerda" ${item.posicao === 'esquerda' ? 'selected' : ''}>Esquerda</option>
+                        <option value="centro" ${item.posicao === 'centro' ? 'selected' : ''}>Centro</option>
+                        <option value="direita" ${item.posicao === 'direita' ? 'selected' : ''}>Direita</option>
+                    </select>
+                    <input type="number" data-k="largura" value="${item.largura || ''}" min="60" max="900" placeholder="Largura">
+                    <input type="number" data-k="altura" value="${item.altura || ''}" min="16" max="400" placeholder="Altura">
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function aplicarModoModalCard(mode = 'full') {
+        modalCardMode = mode === 'rules' ? 'rules' : 'full';
+        if (!cardFieldsDialogEl) return;
+
+        const isRules = modalCardMode === 'rules';
+        cardFieldsDialogEl.classList.toggle('rules-focus', isRules);
+
+        if (cardFieldsTitleEl) {
+            cardFieldsTitleEl.textContent = isRules ? 'Regras de cor dos cards' : 'Campos do card de pedidos';
+        }
+    }
+
+    function abrirModalCamposCard(mode = 'full') {
+        if (!cardFieldsModalEl) return;
+        aplicarModoModalCard(mode);
+        applyModalSizeState();
+        // Usar o mapa correto baseado no tipo de card atual
+        const mapaInicial = currentCardType === 'rotas' ? mapaCamposIniciaisRotas : mapaCamposIniciais;
+        const camposAtivos = currentCardType === 'rotas' ? camposRotas : campos;
+        
+        const ativosMap = new Map(camposAtivos.map(item => [item.campo, { ...defaultsCampo(item.campo), ...item }]));
+        const ativosOrdenados = camposAtivos.map(item => item.campo).filter(campo => camposDisponiveis.includes(campo));
+        const camposOrdenados = [...ativosOrdenados, ...camposDisponiveis.filter(campo => !ativosOrdenados.includes(campo))];
+        camposCardDraft = camposOrdenados.map((campo) => {
+            const base = ativosMap.get(campo) || mapaInicial.get(campo) || defaultsCampo(campo);
+            return {
+                campo,
+                selected: ativosMap.has(campo),
+                rotulo: base.rotulo || campo,
+                icone: base.icone || '',
+                cor: base.cor || '',
+                tamanho: base.tamanho || '',
+                posicao: base.posicao || 'esquerda',
+                largura: base.largura || '',
+                altura: base.altura || '',
+            };
+        });
+        regrasCorDraft = regrasCorAtivas.map((rule, idx) => normalizeRegraCorConfig({ ...rule, prioridade: idx + 1 }, idx));
+        if (cardFieldsSearchEl) cardFieldsSearchEl.value = '';
+        renderCamposModal();
+        renderRegrasCorModal();
+        cardFieldsModalEl.classList.add('open');
+        cardFieldsModalEl.setAttribute('aria-hidden', 'false');
+
+        if (modalCardMode === 'rules') {
+            setTimeout(() => {
+                if (cardColorRulesWrapEl && typeof cardColorRulesWrapEl.scrollIntoView === 'function') {
+                    cardColorRulesWrapEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }, 30);
+        }
+    }
+
+    function carregarConfiguracoesRotasVisual() {
+        // Usar valores das variáveis globais definidas no template
+        const config = window.rotasVisualConfigData;
+        if (!config) return;
+        
+        const mostrarNumero = document.getElementById('rotasConfigMostrarNumero');
+        const corFundo = document.getElementById('rotasConfigCorFundo');
+        const corBorda = document.getElementById('rotasConfigCorBorda');
+        const corNumero = document.getElementById('rotasConfigCorNumero');
+        const tamanhoFonte = document.getElementById('rotasConfigTamanhoFonte');
+        const paddingV = document.getElementById('rotasConfigPaddingV');
+        const paddingH = document.getElementById('rotasConfigPaddingH');
+        const raio = document.getElementById('rotasConfigRaio');
+        
+        if (mostrarNumero) mostrarNumero.checked = config.mostrar_numero;
+        if (corFundo) corFundo.value = config.cor_fundo;
+        if (corBorda) corBorda.value = config.cor_borda;
+        if (corNumero) corNumero.value = config.cor_numero;
+        if (tamanhoFonte) tamanhoFonte.value = config.tamanho_fonte;
+        if (paddingV) paddingV.value = config.padding_vertical;
+        if (paddingH) paddingH.value = config.padding_horizontal;
+        if (raio) raio.value = config.raio;
+    }
+
+    function salvarConfiguracoesRotasVisual(silent = false) {
+        const mostrarNumero = document.getElementById('rotasConfigMostrarNumero');
+        const corFundo = document.getElementById('rotasConfigCorFundo');
+        const corBorda = document.getElementById('rotasConfigCorBorda');
+        const corNumero = document.getElementById('rotasConfigCorNumero');
+        const tamanhoFonte = document.getElementById('rotasConfigTamanhoFonte');
+        const paddingV = document.getElementById('rotasConfigPaddingV');
+        const paddingH = document.getElementById('rotasConfigPaddingH');
+        const raio = document.getElementById('rotasConfigRaio');
+        
+        const dados = {
+            rotas_card_mostrar_numero: mostrarNumero ? mostrarNumero.checked : true,
+            rotas_card_cor_fundo: corFundo ? corFundo.value : '#ffffff',
+            rotas_card_cor_borda: corBorda ? corBorda.value : '#dadce0',
+            rotas_card_cor_numero: corNumero ? corNumero.value : '#4285F4',
+            rotas_card_tamanho_fonte: tamanhoFonte ? parseInt(tamanhoFonte.value) : 13,
+            rotas_card_padding_vertical: paddingV ? parseInt(paddingV.value) : 12,
+            rotas_card_padding_horizontal: paddingH ? parseInt(paddingH.value) : 12,
+            rotas_card_raio: raio ? parseInt(raio.value) : 8
+        };
+        
+        return fetch('{% url "rotas:salvar_config_visual_rotas" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken()
+            },
+            body: JSON.stringify(dados)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Atualizar configurações visuais no app.js em tempo real
+                const novaConfig = {
+                    mostrar_numero: dados.rotas_card_mostrar_numero
+                };
+                window.rotasCardConfig = novaConfig;
+                if (typeof rotasCardConfig !== 'undefined') {
+                    rotasCardConfig = novaConfig;
+                }
+                
+                // Atualizar CSS variables em tempo real
+                const root = document.documentElement;
+                root.style.setProperty('--rotas-card-bg', dados.rotas_card_cor_fundo);
+                root.style.setProperty('--rotas-card-border', dados.rotas_card_cor_borda);
+                root.style.setProperty('--rotas-card-font', dados.rotas_card_tamanho_fonte + 'px');
+                root.style.setProperty('--rotas-card-pad-y', dados.rotas_card_padding_vertical + 'px');
+                root.style.setProperty('--rotas-card-pad-x', dados.rotas_card_padding_horizontal + 'px');
+                root.style.setProperty('--rotas-card-raio', dados.rotas_card_raio + 'px');
+                root.style.setProperty('--rotas-card-numero-cor', dados.rotas_card_cor_numero);
+                
+                // Re-renderizar stops
+                if (typeof renderStops === 'function') {
+                    renderStops();
+                }
+                
+                if (!silent) showToast('✅ Configurações visuais salvas e aplicadas!', 'success');
+                return true;
+            } else {
+                if (!silent) showToast('❌ Erro ao salvar: ' + (data.message || 'Erro desconhecido'), 'error');
+                throw new Error(data.message || 'Erro desconhecido');
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao salvar configurações visuais:', error);
+            if (!silent) showToast('❌ Erro ao salvar configurações', 'error');
+            throw error;
+        });
+    }
+
+    function fecharModalCamposCard() {
+        if (!cardFieldsModalEl) return;
+        saveModalSizeState();
+        cardFieldsModalEl.classList.remove('open');
+        cardFieldsModalEl.setAttribute('aria-hidden', 'true');
+    }
+
+    function getRotasSelecionadas() {
+        if (!rotasCheckboxListEl) return [];
+        return Array.from(rotasCheckboxListEl.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+    }
+
+    function updateFiltroStatusUI() {
+        if (!rotasCheckboxListEl) return;
+        const allCheckboxes = Array.from(rotasCheckboxListEl.querySelectorAll('input[type="checkbox"]'));
+        const checkedCount = allCheckboxes.filter(cb => cb.checked).length;
+        const totalCount = allCheckboxes.length;
+        const hasBusca = !!(filterEl && filterEl.value.trim());
+        const hasFiltroRota = totalCount > 0 && checkedCount < totalCount;
+
+        if (btnRotasTodas) btnRotasTodas.classList.toggle('is-active', totalCount > 0 && checkedCount === totalCount);
+        if (btnRotasNenhuma) btnRotasNenhuma.classList.toggle('is-active', totalCount > 0 && checkedCount === 0);
+        if (btnLimparFiltros) btnLimparFiltros.classList.toggle('is-active', hasBusca || hasFiltroRota);
+        if (rotasFiltroIndicadorEl && btnToggleRotas) {
+            if (hasFiltroRota) {
+                rotasFiltroIndicadorEl.textContent = `${checkedCount}/${totalCount}`;
+                rotasFiltroIndicadorEl.style.display = 'inline-flex';
+                btnToggleRotas.classList.add('is-filtrado');
+                btnToggleRotas.classList.remove('is-open');
+            } else {
+                rotasFiltroIndicadorEl.style.display = 'none';
+                btnToggleRotas.classList.remove('is-filtrado');
+            }
+        }
+    }
+
+    function renderPedidoCard(pedido) {
+        const regraCor = getRegraCorAplicada(pedido);
+        const cardStyle = [
+            regraCor && regraCor.cor_fundo ? `background:${regraCor.cor_fundo};` : '',
+            regraCor && regraCor.cor_borda ? `border-color:${regraCor.cor_borda};` : '',
+            regraCor && regraCor.cor_texto ? `color:${regraCor.cor_texto};` : '',
+            regraCor && regraCor.espessura_borda !== undefined && regraCor.espessura_borda !== '' ? `border-width:${regraCor.espessura_borda}px; border-style:solid;` : '',
+        ].join('');
+
+        // Badge de slot: indica em qual aba de rota o pedido já está
+        const _slotColors = (typeof SLOT_COLORS !== 'undefined') ? SLOT_COLORS : ['#2563eb','#16a34a','#9333ea','#ea580c'];
+        const _slotIdx = (typeof getSlotIndexForPedido === 'function') ? getSlotIndexForPedido(pedido.id) : -1;
+        const _slotNome = (_slotIdx >= 0 && typeof routeSlots !== 'undefined') ? (routeSlots[_slotIdx]?.nome || '') : '';
+        const slotBadge = _slotIdx >= 0
+            ? `<span class="pedido-slot-badge" style="background:${_slotColors[_slotIdx] || '#2563eb'};" title="Na ${_slotNome}">✓</span>`
+            : '';
+
+        const linhas = camposCardAtivos.map(normalizeCampoConfig).filter(c => c.campo).map(campoCfg => {
+            const valor = getFieldValue(pedido, campoCfg.campo);
+            const texto = (valor === null || valor === undefined || String(valor).trim() === '') ? '—' : String(valor);
+            const styleColor = campoCfg.cor
+                ? `color:${campoCfg.cor};`
+                : (regraCor && regraCor.cor_texto ? `color:${regraCor.cor_texto};` : '');
+            const styleSize = campoCfg.tamanho ? `font-size:${campoCfg.tamanho}px;` : '';
+            const styleAlign = campoCfg.posicao === 'direita'
+                ? 'text-align:right; justify-content:flex-end;'
+                : campoCfg.posicao === 'centro'
+                    ? 'text-align:center; justify-content:center;'
+                    : 'text-align:left; justify-content:flex-start;';
+            const styleWidth = campoCfg.largura ? `width:${campoCfg.largura}px; max-width:100%;` : '';
+            const styleHeight = campoCfg.altura ? `min-height:${campoCfg.altura}px;` : '';
+            const icone = campoCfg.icone ? `${campoCfg.icone} ` : '';
+            const rotulo = campoCfg.rotulo || campoCfg.campo;
+            return `<div class="campo" style="display:flex; gap:6px; align-items:flex-start; ${styleColor}${styleSize}${styleAlign}${styleWidth}${styleHeight}"><strong>${icone}${rotulo}:</strong> <span>${texto}</span></div>`;
+        }).join('');
+
+        const semCoordenadas = (pedido.latitude === null || pedido.latitude === undefined || pedido.longitude === null || pedido.longitude === undefined)
+            ? '<div class="sem-coord">⚠ Sem coordenadas (será necessário ajuste manual)</div>'
+            : '';
+
+        return `
+            <div class="pedido-card ${pedido.arquivado ? 'is-arquivado' : ''}" data-pedido-id="${pedido.id}" style="${cardStyle}">
+                <div class="pedido-card-top">
+                    <div class="numero" style="${regraCor && regraCor.cor_texto ? `color:${regraCor.cor_texto};` : ''}">#${pedido.numero_pedido || '—'}${slotBadge}</div>
+                    <div class="pedido-card-btns">
+                        <button type="button" class="btn-info-raio-x" data-raio-x-id="${pedido.id}" data-raio-x-num="${pedido.numero_pedido || ''}" data-raio-x-nome="${pedido.cliente_nome || ''}" title="Raio X do Cliente" aria-label="Raio X do Cliente">i</button>
+                        ${!pedido.arquivado ? `<button type="button" class="btn-arquivar-pedido" data-arquivar-id="${pedido.id}" title="Arquivar pedido" aria-label="Arquivar pedido">−</button>` : `<button type="button" class="btn-restaurar-pedido" data-restaurar-id="${pedido.id}" title="Restaurar pedido" aria-label="Restaurar pedido">↩</button>`}
+                        ${!pedido.arquivado ? `<button type="button" class="btn-add-rota ${pedido.importado ? 'is-added' : ''}" data-add-rota="${pedido.id}" ${pedido.importado ? 'disabled' : ''} title="Adicionar à rota" aria-label="Adicionar à rota">+</button>` : ''}
+                    </div>
+                </div>
+                ${linhas}
+                ${pedido.arquivado && pedido.data_arquivamento ? `<div style="font-size:10px; color:#9ca3af; margin-top:3px;">📅 Arquivado: ${pedido.data_arquivamento}${pedido.dias_para_expirar !== null && pedido.dias_para_expirar !== undefined ? ` &nbsp;<span style="color:${pedido.dias_para_expirar<=3?'#dc2626':'#d97706'}; font-weight:600;">⏰ Expira em ${pedido.dias_para_expirar} dia(s)</span>` : ''}</div>` : ''}
+                ${semCoordenadas}
+            </div>
+        `;
+    }
+
+    function renderPedidos(filtro = '', rotasSelecionadas = []) {
+        const query = (filtro || '').toLowerCase().trim();
+        const rotaSet = new Set((rotasSelecionadas || []).map(v => String(v).toLowerCase().trim()));
+        // Inclui pedidos em TODOS os slots (slots inativos não têm inRoute=true definido)
+        const _allUsedIds = (typeof getAllUsedPedidoIds === 'function') ? getAllUsedPedidoIds() : new Set();
+        const filtrados = pedidos.filter(p => {
+            if (mostrAndoArquivados) {
+                return p.arquivado === true;
+            }
+            if (p.arquivado) return false;
+            if (p.inRoute) return false;
+            if (_allUsedIds.has(String(p.id))) return false;
+
+            const rotaPedido = getRotaPedido(p).toLowerCase();
+            const passouRota = rotaSet.size > 0 && rotaSet.has(rotaPedido);
+            if (!passouRota) return false;
+
+            if (!query) return true;
+            return [p.numero_pedido, p.cliente_nome, p.endereco, p.telefone, p.entregador]
+                .filter(Boolean)
+                .some(valor => String(valor).toLowerCase().includes(query));
+        });
+
+        pedidosFiltradosAtuais = filtrados;
+
+        if (countEl) countEl.textContent = String(filtrados.length);
+
+        if (!filtrados.length) {
+            listEl.innerHTML = '<div class="pedido-empty">Nenhum pedido encontrado.</div>';
+            if (visualizacaoPedidosAtiva) {
+                desativarVisualizacaoPedidos();
+            }
+            return;
+        }
+
+        if (panelEl && panelEl.classList.contains('fullscreen')) {
+            const grupos = filtrados.reduce((acc, pedido) => {
+                const rota = getRotaPedido(pedido);
+                if (!acc[rota]) acc[rota] = [];
+                acc[rota].push(pedido);
+                return acc;
+            }, {});
+
+            const rotasOrdenadas = Object.keys(grupos).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+            listEl.innerHTML = rotasOrdenadas.map(rota => {
+                const cards = grupos[rota].map(renderPedidoCard).join('');
+                return `
+                    <div class="rota-column">
+                        <div class="rota-column-title">
+                            <span>${rota}</span>
+                            <span class="rota-column-count">${grupos[rota].length}</span>
+                        </div>
+                        ${cards}
+                    </div>
+                `;
+            }).join('');
+            return;
+        }
+
+        listEl.innerHTML = filtrados.map(renderPedidoCard).join('');
+
+        if (visualizacaoPedidosAtiva) {
+            atualizarVisualizacaoPedidos(false);
+        }
+    }
+
+    if (rotasCheckboxListEl) {
+        const rotasUnicas = [...new Set(pedidos.map(getRotaPedido))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+        rotasCheckboxListEl.innerHTML = rotasUnicas.map((rota, idx) => `
+            <label class="rotas-checkbox-item">
+                <input type="checkbox" value="${rota}" ${idx >= 0 ? 'checked' : ''}>
+                <span>${rota}</span>
+            </label>
+        `).join('');
+
+        rotasCheckboxListEl.addEventListener('change', function () {
+            renderPedidos(filterEl ? filterEl.value : '', getRotasSelecionadas());
+            updateFiltroStatusUI();
+        });
+    }
+
+    renderPedidos('', getRotasSelecionadas());
+    updateFiltroStatusUI();
+
+    // Atualiza o painel de pedidos quando troca de aba de rota (ex: badge de slot)
+    window.addEventListener('route-slots-changed', function() {
+        renderPedidos(filterEl ? filterEl.value : '', getRotasSelecionadas());
+    });
+
+    // Renderiza as abas após o app.js inicializar
+    setTimeout(function() {
+        if (typeof renderRouteSlotTabs === 'function') renderRouteSlotTabs();
+        // Reconecta inRoute para pedidos nos slots armazenados (após reload)
+        if (typeof getAllUsedPedidoIds === 'function') {
+            const usedIds = getAllUsedPedidoIds();
+            pedidos.forEach(function(p) {
+                if (usedIds.has(String(p.id))) p.inRoute = true;
+            });
+        }
+        renderPedidos(filterEl ? filterEl.value : '', getRotasSelecionadas());
+        updateFiltroStatusUI();
+    }, 800);
+
+    if (btnEditarCard) {
+        btnEditarCard.addEventListener('click', function () {
+            abrirModalCamposCard('full');
+        });
+    }
+    if (btnAbrirRegrasCor) {
+        btnAbrirRegrasCor.addEventListener('click', function () {
+            abrirModalCamposCard('rules');
+        });
+    }
+
+    if (btnVisualizarPedidosMapa) {
+        btnVisualizarPedidosMapa.addEventListener('click', function () {
+            if (visualizacaoPedidosAtiva) {
+                desativarVisualizacaoPedidos(true);
+            } else {
+                ativarVisualizacaoPedidos();
+            }
+        });
+    }
+
+    if (btnImportarAgora) {
+        btnImportarAgora.addEventListener('click', function () {
+            importarPedidos({ viaAuto: false });
+        });
+    }
+
+    const btnVerArquivados = document.getElementById('btnVerArquivados');
+    if (btnVerArquivados) {
+        btnVerArquivados.addEventListener('click', function () {
+            mostrAndoArquivados = !mostrAndoArquivados;
+            btnVerArquivados.classList.toggle('active', mostrAndoArquivados);
+            // Fecha histórico se aberto
+            const painelHist = document.getElementById('painel-historico-exclusoes');
+            if (painelHist) painelHist.style.display = 'none';
+            renderPedidos(filterEl ? filterEl.value : '', getRotasSelecionadas());
+        });
+    }
+
+    // Painel Histórico de Exclusões
+    const btnHistorico = document.getElementById('btnHistoricoExclusoes');
+    if (btnHistorico) {
+        btnHistorico.addEventListener('click', function () {
+            let painel = document.getElementById('painel-historico-exclusoes');
+            if (!painel) {
+                painel = document.createElement('div');
+                painel.id = 'painel-historico-exclusoes';
+                painel.style.cssText = 'position:fixed;top:0;right:0;width:680px;max-width:100vw;height:100vh;background:#fff;box-shadow:-4px 0 20px rgba(0,0,0,.15);z-index:9999;display:flex;flex-direction:column;';
+                painel.innerHTML = `
+                    <div style="padding:14px 18px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;background:#f9fafb;">
+                        <strong style="font-size:15px;">📋 Histórico de Exclusões</strong>
+                        <button id="btn-fechar-historico" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;">✕</button>
+                    </div>
+                    <div style="padding:12px 18px;border-bottom:1px solid #e5e7eb;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                        <label style="font-size:13px;">De: <input type="date" id="hist-data-de" style="padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;margin-left:4px;"></label>
+                        <label style="font-size:13px;">Até: <input type="date" id="hist-data-ate" style="padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;margin-left:4px;"></label>
+                        <button id="btn-buscar-historico" style="padding:5px 14px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;">🔍 Buscar</button>
+                        <button id="btn-export-historico-csv" style="padding:5px 14px;background:#166534;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;">⬇ CSV</button>
+                        <span id="hist-info" style="font-size:12px;color:#6b7280;"></span>
+                    </div>
+                    <div id="hist-tabela-container" style="flex:1;overflow-y:auto;padding:10px 18px;">
+                        <p style="font-size:13px;color:#888;font-style:italic;">Use os filtros acima e clique em Buscar.</p>
+                    </div>
+                `;
+                document.body.appendChild(painel);
+
+                document.getElementById('btn-fechar-historico').addEventListener('click', () => { painel.style.display = 'none'; });
+
+                const historicoUrl = "{% url 'rotas:historico_exclusoes' %}";
+                const historicoCsvUrl = "{% url 'rotas:historico_exclusoes_csv' %}";
+
+                function buscarHistorico() {
+                    const de = document.getElementById('hist-data-de').value;
+                    const ate = document.getElementById('hist-data-ate').value;
+                    const info = document.getElementById('hist-info');
+                    info.textContent = 'Carregando...';
+                    const params = new URLSearchParams();
+                    if (de) params.set('data_de', de);
+                    if (ate) params.set('data_ate', ate);
+                    fetch(`${historicoUrl}?${params}`)
+                        .then(r => r.json())
+                        .then(data => {
+                            info.textContent = `${data.total} registro(s)`;
+                            const cont = document.getElementById('hist-tabela-container');
+                            if (!data.registros.length) {
+                                cont.innerHTML = '<p style="font-size:13px;color:#888;font-style:italic;">Nenhum registro encontrado.</p>';
+                                return;
+                            }
+                            let html = '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+                            html += '<thead><tr style="background:#f3f4f6;"><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #e5e7eb;">Pedido</th><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #e5e7eb;">Cliente</th><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #e5e7eb;">Arquivado</th><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #e5e7eb;">Quarentena</th><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #e5e7eb;">Excluído em</th></tr></thead><tbody>';
+                            data.registros.forEach(r => {
+                                html += `<tr style="border-bottom:1px solid #f3f4f6;">
+                                    <td style="padding:5px 8px;">${r.numero_pedido}</td>
+                                    <td style="padding:5px 8px;">${r.cliente_nome}</td>
+                                    <td style="padding:5px 8px;">${r.data_arquivamento || '—'}</td>
+                                    <td style="padding:5px 8px;">${r.dias_quarentena ? r.dias_quarentena + ' dias' : '—'}</td>
+                                    <td style="padding:5px 8px;color:#dc2626;">${r.data_exclusao}</td>
+                                </tr>`;
+                            });
+                            html += '</tbody></table>';
+                            cont.innerHTML = html;
+                        })
+                        .catch(() => { info.textContent = 'Erro ao buscar.'; });
+                }
+
+                document.getElementById('btn-buscar-historico').addEventListener('click', buscarHistorico);
+                document.getElementById('btn-export-historico-csv').addEventListener('click', function () {
+                    const de = document.getElementById('hist-data-de').value;
+                    const ate = document.getElementById('hist-data-ate').value;
+                    const params = new URLSearchParams();
+                    if (de) params.set('data_de', de);
+                    if (ate) params.set('data_ate', ate);
+                    window.location.href = `${historicoCsvUrl}?${params}`;
+                });
+
+                buscarHistorico();
+            } else {
+                painel.style.display = painel.style.display === 'none' ? 'flex' : 'none';
+            }
+        });
+    }
+
+    // Contagem inicial de arquivados
+    atualizarContadorArquivados();
+
+    if (btnFecharImportSummary && importSummaryModalEl) {
+        btnFecharImportSummary.addEventListener('click', function () {
+            importSummaryModalEl.classList.remove('is-open');
+            importSummaryModalEl.setAttribute('aria-hidden', 'true');
+        });
+    }
+
+    if (autoImportConfig && autoImportConfig.habilitado) {
+        if (!queryAtivaId) {
+            showToast('Ative uma query em SQL + Card para usar a importação automática.', 'info');
+        } else {
+            const intervaloMs = Math.max(30, Number(autoImportConfig.intervalo) || 120) * 1000;
+            setTimeout(() => {
+                importarPedidos({ viaAuto: true });
+                autoImportTimer = setInterval(() => importarPedidos({ viaAuto: true }), intervaloMs);
+            }, 1500);
+        }
+    }
+    
+    // Event listeners para tipo de card
+    if (btnCardTipoPedidos) {
+        btnCardTipoPedidos.addEventListener('click', function () {
+            switchCardType('pedidos');
+        });
+    }
+    if (btnCardTipoRotas) {
+        btnCardTipoRotas.addEventListener('click', function () {
+            switchCardType('rotas');
+            _popularSelectOtimizBairro();
+        });
+    }
+    
+    // Modal Opcoes de Rota
+    if (btnRotasOpcoes) {
+        btnRotasOpcoes.addEventListener('click', function () {
+            if (!rotasOpcoesModalEl) return;
+            rotasOpcoesModalEl.classList.add('open');
+            rotasOpcoesModalEl.setAttribute('aria-hidden', 'false');
+            carregarConfiguracoesRotasVisual();
+            carregarConfiguracaoBuscaEndereco();
+            _popularSelectOtimizBairro();
+        });
+    }
+    function fecharOpcoesRotaModal() {
+        if (!rotasOpcoesModalEl) return;
+        rotasOpcoesModalEl.classList.remove('open');
+        rotasOpcoesModalEl.setAttribute('aria-hidden', 'true');
+    }
+    if (btnFecharOpcoesRota) btnFecharOpcoesRota.addEventListener('click', fecharOpcoesRotaModal);
+    if (btnCancelarOpcoesRota) btnCancelarOpcoesRota.addEventListener('click', fecharOpcoesRotaModal);
+    if (rotasOpcoesModalEl) {
+        rotasOpcoesModalEl.addEventListener('click', function (e) {
+            if (e.target === rotasOpcoesModalEl) fecharOpcoesRotaModal();
+        });
+    }
+    if (btnSalvarOpcoesRota) {
+        btnSalvarOpcoesRota.addEventListener('click', async function () {
+            try {
+                await salvarConfiguracoesRotasVisual(true);
+                await salvarConfiguracaoBuscaEndereco(true);
+                showToast('✅ Opções de rota salvas com sucesso!', 'success');
+                fecharOpcoesRotaModal();
+            } catch (error) {
+                showToast(error.message || '❌ Erro ao salvar opções de rota.', 'error');
+            }
+        });
+    }
+
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.busca-endereco-up, .busca-endereco-down, .busca-endereco-remove');
+        if (!btn) return;
+        const idx = parseInt(btn.dataset.idx, 10);
+        if (Number.isNaN(idx)) return;
+        if (btn.classList.contains('busca-endereco-up') && idx > 0) {
+            [camposBuscaEndereco[idx - 1], camposBuscaEndereco[idx]] = [camposBuscaEndereco[idx], camposBuscaEndereco[idx - 1]];
+        } else if (btn.classList.contains('busca-endereco-down') && idx < camposBuscaEndereco.length - 1) {
+            [camposBuscaEndereco[idx], camposBuscaEndereco[idx + 1]] = [camposBuscaEndereco[idx + 1], camposBuscaEndereco[idx]];
+        } else if (btn.classList.contains('busca-endereco-remove')) {
+            camposBuscaEndereco.splice(idx, 1);
+        }
+        popularSelectBuscaEndereco();
+    });
+
+    document.addEventListener('click', function(e) {
+        if (e.target.id !== 'btnBuscaEnderecoAddCampo') return;
+        const select = document.getElementById('buscaEnderecoCampoAddSelect');
+        if (!select || !select.value) return;
+        if (camposBuscaEndereco.indexOf(select.value) === -1) {
+            camposBuscaEndereco.push(select.value);
+            camposBuscaEndereco = normalizeBuscaEnderecoCampos(camposBuscaEndereco);
+        }
+        popularSelectBuscaEndereco();
+    });
+
+    // Event listener para botão de configurar Cards de Rota no sidebar
+    if (btnConfigRotaCards) {
+        btnConfigRotaCards.addEventListener('click', function () {
+            switchCardType('rotas');
+            abrirModalCamposCard('full');
+            setTimeout(_popularSelectOtimizBairro, 80);
+        });
+    }
+
+    // Renderiza a lista de prioridade e popula o select de adição
+    function _popularSelectOtimizBairro() {
+        const sel   = document.getElementById('otimizCampoAddSelect');
+        const chk   = document.getElementById('rotasConfigOtimizBairro');
+        const wrap  = document.getElementById('campoOtimizBairroWrap');
+        if (!sel) return;
+
+        const todosOsCampos = (window._fermap_campos_sql || []).slice().sort(function(a,b){ return a.localeCompare(b,'pt-BR'); });
+        let camposSalvos = [];
+        try { camposSalvos = JSON.parse(localStorage.getItem('fermap_otimiz_bairro_campo') || '[]'); } catch(e) {}
+        if (!Array.isArray(camposSalvos)) camposSalvos = camposSalvos ? [String(camposSalvos)] : [];
+
+        // Popular select com campos ainda não adicionados
+        sel.innerHTML = '<option value="">— selecione um campo —</option>';
+        todosOsCampos.forEach(function(c) {
+            if (camposSalvos.indexOf(c) === -1) {
+                var opt = document.createElement('option');
+                opt.value   = c;
+                opt.textContent = c;
+                sel.appendChild(opt);
+            }
+        });
+
+        // Renderizar lista de prioridade
+        _renderOtimizPrioridadeLista(camposSalvos, todosOsCampos);
+
+        // Restaurar estado do checkbox principal e wrap
+        const enabled = localStorage.getItem('fermap_otimiz_bairro_enabled') === '1';
+        if (chk)  chk.checked = enabled;
+        if (wrap) wrap.style.display = enabled ? 'block' : 'none';
+    }
+
+    function _renderOtimizPrioridadeLista(camposSalvos, todosOsCampos) {
+        const listaEl = document.getElementById('otimizCamposPrioridadeLista');
+        if (!listaEl) return;
+        if (!camposSalvos.length) {
+            listaEl.innerHTML = '<p style="font-size:11px; color:#94a3b8; font-style:italic; margin:0 0 4px;">Nenhum campo adicionado ainda.</p>';
+            return;
+        }
+        listaEl.innerHTML = camposSalvos.map(function(c, i) {
+            return '<div class="otimiz-prio-item" data-campo="' + c.replace(/"/g,'&quot;') + '" '
+                + 'style="display:flex; align-items:center; gap:6px; padding:5px 8px; margin-bottom:4px; '
+                + 'background:#f1f5f9; border:1px solid #e2e8f0; border-radius:6px; font-size:12px;">'
+                + '<span style="min-width:18px; height:18px; background:#0d6efd; color:#fff; border-radius:50%; '
+                +   'font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center;">' + (i+1) + '</span>'
+                + '<span style="flex:1; font-weight:500;">' + c + '</span>'
+                + (i > 0
+                    ? '<button type="button" class="otimiz-prio-up" data-idx="' + i + '" '
+                    + 'style="background:none; border:1px solid #cbd5e1; border-radius:4px; padding:1px 5px; cursor:pointer; font-size:11px;" title="Mover para cima">▲</button>'
+                    : '<span style="width:26px;"></span>')
+                + (i < camposSalvos.length - 1
+                    ? '<button type="button" class="otimiz-prio-down" data-idx="' + i + '" '
+                    + 'style="background:none; border:1px solid #cbd5e1; border-radius:4px; padding:1px 5px; cursor:pointer; font-size:11px;" title="Mover para baixo">▼</button>'
+                    : '<span style="width:26px;"></span>')
+                + '<button type="button" class="otimiz-prio-remove" data-idx="' + i + '" '
+                + 'style="background:none; border:1px solid #fca5a5; border-radius:4px; padding:1px 6px; cursor:pointer; font-size:11px; color:#ef4444;" title="Remover">×</button>'
+                + '</div>';
+        }).join('');
+    }
+
+    // Delegação de eventos para a lista de prioridade
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.otimiz-prio-up, .otimiz-prio-down, .otimiz-prio-remove');
+        if (!btn) return;
+        let camposSalvos = [];
+        try { camposSalvos = JSON.parse(localStorage.getItem('fermap_otimiz_bairro_campo') || '[]'); } catch(er) {}
+        if (!Array.isArray(camposSalvos)) camposSalvos = [];
+        const idx = parseInt(btn.dataset.idx, 10);
+        if (btn.classList.contains('otimiz-prio-up') && idx > 0) {
+            [camposSalvos[idx-1], camposSalvos[idx]] = [camposSalvos[idx], camposSalvos[idx-1]];
+        } else if (btn.classList.contains('otimiz-prio-down') && idx < camposSalvos.length - 1) {
+            [camposSalvos[idx], camposSalvos[idx+1]] = [camposSalvos[idx+1], camposSalvos[idx]];
+        } else if (btn.classList.contains('otimiz-prio-remove')) {
+            camposSalvos.splice(idx, 1);
+        }
+        localStorage.setItem('fermap_otimiz_bairro_campo', JSON.stringify(camposSalvos));
+        _popularSelectOtimizBairro();
+    });
+
+    // Botão Adicionar campo
+    document.addEventListener('click', function(e) {
+        if (e.target.id !== 'btnOtimizAddCampo') return;
+        const sel = document.getElementById('otimizCampoAddSelect');
+        if (!sel || !sel.value) return;
+        let camposSalvos = [];
+        try { camposSalvos = JSON.parse(localStorage.getItem('fermap_otimiz_bairro_campo') || '[]'); } catch(er) {}
+        if (!Array.isArray(camposSalvos)) camposSalvos = [];
+        if (camposSalvos.indexOf(sel.value) === -1) {
+            camposSalvos.push(sel.value);
+            localStorage.setItem('fermap_otimiz_bairro_campo', JSON.stringify(camposSalvos));
+        }
+        _popularSelectOtimizBairro();
+    });
+    
+    function switchCardType(tipo) {
+        currentCardType = tipo;
+        
+        // Atualizar visual dos botões
+        if (btnCardTipoPedidos && btnCardTipoRotas) {
+            btnCardTipoPedidos.classList.toggle('active', tipo === 'pedidos');
+            btnCardTipoRotas.classList.toggle('active', tipo === 'rotas');
+        }
+        
+        // Atualizar título
+        if (cardFieldsTitleEl && modalCardMode === 'full') {
+            cardFieldsTitleEl.textContent = tipo === 'pedidos' 
+                ? 'Campos do card de pedidos' 
+                : 'Campos do card de rota';
+        }
+        
+        // Mostrar/ocultar seções específicas
+        const colorRulesEl = document.querySelector('.card-color-rules');
+        const rotasVisualEl = document.getElementById('rotasVisualConfig');
+        const cardFieldsToolbarEl = document.querySelector('.card-fields-toolbar');
+        
+        // Para pedidos: mostrar regras de cor; para rotas: mostrar configurações visuais
+        if (colorRulesEl) colorRulesEl.style.display = 'block';  // Mostrar sempre
+
+        // Reposicionar campo de busca e lista para aparecer logo após a configuração visual
+        const cardFieldsToolbarWrap = cardFieldsToolbarEl ? cardFieldsToolbarEl.parentElement : null;
+        const rotasVisualContainer = document.getElementById('rotasVisualConfig');
+        if (cardFieldsToolbarEl && rotasVisualContainer) {
+            if (tipo === 'rotas') {
+                rotasVisualContainer.insertAdjacentElement('afterend', cardFieldsToolbarEl);
+            } else {
+                cardFieldsToolbarWrap?.appendChild(cardFieldsToolbarEl);
+            }
+        }
+
+        if (cardFieldsToolbarEl) {
+            // Atualizar placeholder da busca
+            const searchInput = cardFieldsToolbarEl.querySelector('#cardFieldsSearch');
+            if (searchInput) {
+                searchInput.placeholder = tipo === 'pedidos' ? 'Buscar campo do SQL...' : 'Buscar campo...';
+            }
+        }
+        
+        if (rotasVisualEl) {
+            rotasVisualEl.style.display = tipo === 'rotas' ? 'block' : 'none';
+            if (tipo === 'rotas') {
+                carregarConfiguracoesRotasVisual();
+            }
+        }
+        
+        // Carregar regras de cor corretas para o tipo de card
+        if (tipo === 'rotas') {
+            regrasCorAtivas = [...regrasCorRotas];
+        } else {
+            regrasCorAtivas = [...regrasCorPedidos];
+        }
+        regrasCorDraft = regrasCorAtivas.map(r => ({...r}));
+        renderRegrasCorModal();
+        
+        // Alternar lista de campos disponíveis baseado no tipo (ambos vindos do SQL/preview)
+        camposDisponiveis = tipo === 'rotas' ? camposDisponiveisRotas : camposDisponiveisPedidos;
+        
+        // Recarregar campos com os dados apropriados
+        const camposAtivos = tipo === 'pedidos' ? (Array.isArray(campos) ? campos : []) : (Array.isArray(camposRotas) ? camposRotas : []);
+        const mapaInicial = tipo === 'rotas' ? mapaCamposIniciaisRotas : mapaCamposIniciais;
+        const ativosMap = new Map(camposAtivos.map(item => [item.campo, { ...defaultsCampo(item.campo), ...item }]));
+        
+        // Criar draft dos campos baseado na lista ativa
+        const ativosOrdenados = camposAtivos.map(item => item.campo).filter(campo => camposDisponiveis.includes(campo));
+        const camposOrdenados = [...ativosOrdenados, ...camposDisponiveis.filter(campo => !ativosOrdenados.includes(campo))];
+        
+        camposCardDraft = camposOrdenados.map((campo) => {
+            const itemAtivo = ativosMap.get(campo);
+            if (itemAtivo) {
+                return { ...itemAtivo, selected: true };
+            }
+            const base = mapaInicial.get(campo) || defaultsCampo(campo);
+            return { ...base, selected: false };
+        });
+        
+        camposCardAtivos = camposAtivos.map((item) => ({
+            campo: String(item.campo || '').trim(),
+            rotulo: String(item.rotulo || item.campo || '').trim(),
+            icone: String(item.icone || '').trim(),
+            cor: String(item.cor || '').trim(),
+            tamanho: String(item.tamanho || '').trim(),
+            posicao: String(item.posicao || 'esquerda').trim() || 'esquerda',
+            largura: String(item.largura || '').trim(),
+            altura: String(item.altura || '').trim(),
+        })).filter(c => c.campo);
+        
+        renderCamposModal();
+    }
+    
+    if (btnCancelarCamposCard) {
+        btnCancelarCamposCard.addEventListener('click', fecharModalCamposCard);
+    }
+    if (btnExpandirModalCard && cardFieldsDialogEl) {
+        btnExpandirModalCard.addEventListener('click', function () {
+            const expanded = cardFieldsDialogEl.classList.toggle('maximized');
+            localStorage.setItem(MODAL_MAX_STORAGE_KEY, expanded ? '1' : '0');
+            updateExpandButtonUI();
+            if (!expanded) saveModalSizeState();
+        });
+
+        cardFieldsDialogEl.addEventListener('mouseup', function () {
+            saveModalSizeState();
+        });
+    }
+    if (cardFieldsModalEl) {
+        cardFieldsModalEl.addEventListener('click', function (event) {
+            if (event.target === cardFieldsModalEl) {
+                fecharModalCamposCard();
+            }
+        });
+    }
+    if (cardFieldsSearchEl) {
+        cardFieldsSearchEl.addEventListener('input', renderCamposModal);
+    }
+    if (cardFieldsListEl) {
+        cardFieldsListEl.addEventListener('click', function (event) {
+            const button = event.target.closest('button[data-action]');
+            if (!button) return;
+
+            const itemEl = button.closest('[data-item-campo]');
+            if (!itemEl) return;
+            const campo = itemEl.getAttribute('data-item-campo');
+            const action = button.getAttribute('data-action');
+            if (!campo || !action) return;
+
+            const idx = camposCardDraft.findIndex(x => x.campo === campo);
+            if (idx < 0) return;
+
+            if (action === 'up' && idx > 0) {
+                [camposCardDraft[idx - 1], camposCardDraft[idx]] = [camposCardDraft[idx], camposCardDraft[idx - 1]];
+                renderCamposModal();
+            }
+            if (action === 'down' && idx < camposCardDraft.length - 1) {
+                [camposCardDraft[idx + 1], camposCardDraft[idx]] = [camposCardDraft[idx], camposCardDraft[idx + 1]];
+                renderCamposModal();
+            }
+        });
+
+        cardFieldsListEl.addEventListener('input', function (event) {
+            const target = event.target;
+            const itemEl = target.closest('[data-item-campo]');
+            if (!itemEl) return;
+            const campo = itemEl.getAttribute('data-item-campo');
+            const key = target.getAttribute('data-k');
+            if (!campo || !key) return;
+
+            const item = camposCardDraft.find(x => x.campo === campo);
+            if (!item) return;
+
+            if (key === 'selected') {
+                item.selected = !!target.checked;
+            } else {
+                item[key] = target.value;
+            }
+        });
+
+        cardFieldsListEl.addEventListener('change', function (event) {
+            const target = event.target;
+            const itemEl = target.closest('[data-item-campo]');
+            if (!itemEl) return;
+            const campo = itemEl.getAttribute('data-item-campo');
+            const key = target.getAttribute('data-k');
+            if (!campo || !key) return;
+
+            const item = camposCardDraft.find(x => x.campo === campo);
+            if (!item) return;
+
+            if (key === 'selected') {
+                item.selected = !!target.checked;
+            } else {
+                item[key] = target.value;
+            }
+        });
+    }
+    if (btnCamposTodos && cardFieldsListEl) {
+        btnCamposTodos.addEventListener('click', function () {
+            camposCardDraft.forEach(item => item.selected = true);
+            renderCamposModal();
+        });
+    }
+    if (btnCamposNenhum && cardFieldsListEl) {
+        btnCamposNenhum.addEventListener('click', function () {
+            camposCardDraft.forEach(item => item.selected = false);
+            renderCamposModal();
+        });
+    }
+    if (btnSalvarCamposCard && cardFieldsListEl) {
+        btnSalvarCamposCard.addEventListener('click', async function () {
+            const selecionados = camposCardDraft.filter(item => item.selected);
+
+            if (!selecionados.length) {
+                showToast('Selecione pelo menos 1 campo para exibir no card.', 'error');
+                return;
+            }
+
+            const payload = selecionados.map((item) => ({
+                campo: item.campo,
+                rotulo: String(item.rotulo || item.campo).trim() || item.campo,
+                icone: String(item.icone || '').trim(),
+                cor: String(item.cor || '').trim(),
+                tamanho: String(item.tamanho || '').trim(),
+                posicao: String(item.posicao || 'esquerda').trim() || 'esquerda',
+                largura: String(item.largura || '').trim(),
+                altura: String(item.altura || '').trim(),
+            }));
+
+            const regrasPayload = regrasCorDraft
+                .map((rule, idx) => ({
+                    campo: String(rule.campo || '').trim(),
+                    operador: String(rule.operador || 'igual').trim() || 'igual',
+                    valor: String(rule.valor || '').trim(),
+                    cor_fundo: String(rule.cor_fundo || '').trim(),
+                    cor_borda: String(rule.cor_borda || '').trim(),
+                    cor_texto: String(rule.cor_texto || '').trim(),
+                    ativo: !!rule.ativo,
+                    prioridade: idx + 1,
+                }))
+                .filter(rule => rule.campo && (rule.cor_fundo || rule.cor_borda || rule.cor_texto));
+
+            btnSalvarCamposCard.disabled = true;
+            const oldText = btnSalvarCamposCard.textContent;
+            btnSalvarCamposCard.textContent = 'Salvando...';
+
+            try {
+                const response = await fetch(salvarCamposCardUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': getCsrfToken(),
+                    },
+                    body: JSON.stringify({ 
+                        campos: payload, 
+                        regras_cor: regrasPayload,
+                        tipo_card: currentCardType 
+                    }),
+                });
+
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok || data.success === false) {
+                    throw new Error(data.message || 'Não foi possível salvar os campos do card.');
+                }
+
+                const tipoMsg = currentCardType === 'rotas' ? 'cards de rota' : 'cards de pedidos';
+                const salvos = Array.isArray(data.campos) ? data.campos : payload;
+                const camposSalvos = salvos.map((item) => ({
+                    campo: String(item.campo || '').trim(),
+                    rotulo: String(item.rotulo || item.campo || '').trim(),
+                    icone: String(item.icone || '').trim(),
+                    cor: String(item.cor || '').trim(),
+                    tamanho: String(item.tamanho || '').trim(),
+                    posicao: String(item.posicao || 'esquerda').trim() || 'esquerda',
+                    largura: String(item.largura || '').trim(),
+                    altura: String(item.altura || '').trim(),
+                })).filter(c => c.campo);
+
+                if (currentCardType === 'rotas') {
+                    // Atualizar campos de exibição das rotas no app.js
+                    window.rotasCamposExibicao = camposSalvos;
+                    if (typeof rotasCamposExibicao !== 'undefined') {
+                        rotasCamposExibicao = camposSalvos;
+                    }
+                    // Atualizar regras de cor de rotas
+                    regrasCorRotas = Array.isArray(data.regras_cor)
+                        ? data.regras_cor.map((rule, idx) => normalizeRegraCorConfig(rule, idx))
+                        : regrasPayload.map((rule, idx) => normalizeRegraCorConfig(rule, idx));
+                    regrasCorAtivas = [...regrasCorRotas];
+                    // Exportar para o app.js
+                    window.rotasRegrasCor = regrasCorRotas;
+                    if (typeof rotasRegrasCor !== 'undefined') {
+                        rotasRegrasCor = regrasCorRotas;
+                    }
+                    // Re-renderizar os stops com os novos campos
+                    if (typeof renderStops === 'function') {
+                        renderStops();
+                    }
+                } else {
+                    camposCardAtivos = camposSalvos;
+                    // Atualizar regras de cor de pedidos
+                    regrasCorPedidos = Array.isArray(data.regras_cor)
+                        ? data.regras_cor.map((rule, idx) => normalizeRegraCorConfig(rule, idx))
+                        : regrasPayload.map((rule, idx) => normalizeRegraCorConfig(rule, idx));
+                    regrasCorAtivas = [...regrasCorPedidos];
+                }
+
+                renderPedidos(filterEl ? filterEl.value : '', getRotasSelecionadas());
+                fecharModalCamposCard();
+                showToast(`Configuração dos ${tipoMsg} salva com sucesso!`);
+            } catch (error) {
+                showToast(error.message || 'Erro ao salvar configuração do card.', 'error');
+            } finally {
+                btnSalvarCamposCard.disabled = false;
+                btnSalvarCamposCard.textContent = oldText;
+            }
+        });
+    }
+
+    const btnSalvarRotasVisual = document.getElementById('btnSalvarRotasVisual');
+    if (btnSalvarRotasVisual) {
+        btnSalvarRotasVisual.addEventListener('click', function () {
+            salvarConfiguracoesRotasVisual().catch(() => {});
+        });
+    }
+
+    if (btnAdicionarRegraCor) {
+        btnAdicionarRegraCor.addEventListener('click', function () {
+            const campoDefault = camposDisponiveis[0] || 'numero_pedido';
+            regrasCorDraft.push(normalizeRegraCorConfig({ campo: campoDefault, operador: 'igual', valor: '', ativo: true }, regrasCorDraft.length));
+            renderRegrasCorModal();
+        });
+    }
+
+    if (cardColorRulesListEl) {
+        cardColorRulesListEl.addEventListener('click', function (event) {
+            // Lidar com botão de paleta de cores
+            const paletteBtn = event.target.closest('button.btn-palette-open');
+            if (paletteBtn) {
+                event.stopPropagation();
+                const field = paletteBtn.getAttribute('data-palette-field');
+                const ruleItem = paletteBtn.closest('[data-rule-idx]');
+                if (!ruleItem || !field) return;
+                const ruleIdx = Number(ruleItem.getAttribute('data-rule-idx'));
+                if (Number.isNaN(ruleIdx) || ruleIdx < 0 || ruleIdx >= regrasCorDraft.length) return;
+                const colorInput = ruleItem.querySelector(`[data-rk="${field}"]`);
+                window.openColorPalette(paletteBtn, function(color) {
+                    regrasCorDraft[ruleIdx][field] = color;
+                    if (colorInput) colorInput.value = color;
+                    renderRegrasCorModal();
+                });
+                return;
+            }
+
+            // Lidar com botões de reset de cor
+            const resetBtn = event.target.closest('button[data-reset-color]');
+            if (resetBtn) {
+                const itemEl = resetBtn.closest('[data-rule-idx]');
+                if (!itemEl) return;
+                const idx = Number(itemEl.getAttribute('data-rule-idx'));
+                if (Number.isNaN(idx) || idx < 0 || idx >= regrasCorDraft.length) return;
+                
+                const colorKey = resetBtn.getAttribute('data-reset-color');
+                const defaultColors = { cor_fundo: '#ffffff', cor_borda: '#dfe3e8', cor_texto: '#000000' };
+                if (colorKey && defaultColors[colorKey]) {
+                    regrasCorDraft[idx][colorKey] = '';  // String vazia = não aplicar estilo
+                    renderRegrasCorModal();
+                }
+                return;
+            }
+
+            // Lidar com botões de ação (remover, up, down)
+            const actionBtn = event.target.closest('button[data-rule-action]');
+            if (!actionBtn) return;
+            const itemEl = actionBtn.closest('[data-rule-idx]');
+            if (!itemEl) return;
+
+            const idx = Number(itemEl.getAttribute('data-rule-idx'));
+            if (Number.isNaN(idx) || idx < 0 || idx >= regrasCorDraft.length) return;
+
+            const action = actionBtn.getAttribute('data-rule-action');
+            if (action === 'remove') {
+                regrasCorDraft.splice(idx, 1);
+            } else if (action === 'up' && idx > 0) {
+                [regrasCorDraft[idx - 1], regrasCorDraft[idx]] = [regrasCorDraft[idx], regrasCorDraft[idx - 1]];
+            } else if (action === 'down' && idx < regrasCorDraft.length - 1) {
+                [regrasCorDraft[idx + 1], regrasCorDraft[idx]] = [regrasCorDraft[idx], regrasCorDraft[idx + 1]];
+            }
+            renderRegrasCorModal();
+        });
+
+        cardColorRulesListEl.addEventListener('input', function (event) {
+            const target = event.target;
+            const itemEl = target.closest('[data-rule-idx]');
+            if (!itemEl) return;
+            const idx = Number(itemEl.getAttribute('data-rule-idx'));
+            if (Number.isNaN(idx) || idx < 0 || idx >= regrasCorDraft.length) return;
+            const key = target.getAttribute('data-rk');
+            if (!key) return;
+
+            if (key === 'ativo') {
+                regrasCorDraft[idx].ativo = !!target.checked;
+            } else {
+                regrasCorDraft[idx][key] = target.value;
+            }
+        });
+
+        cardColorRulesListEl.addEventListener('change', function (event) {
+            const target = event.target;
+            const itemEl = target.closest('[data-rule-idx]');
+            if (!itemEl) return;
+            const idx = Number(itemEl.getAttribute('data-rule-idx'));
+            if (Number.isNaN(idx) || idx < 0 || idx >= regrasCorDraft.length) return;
+            const key = target.getAttribute('data-rk');
+            if (!key) return;
+
+            if (key === 'ativo') {
+                regrasCorDraft[idx].ativo = !!target.checked;
+            } else {
+                regrasCorDraft[idx][key] = target.value;
+            }
+
+            // Ao mudar o operador, rerenderiza para atualizar UI do campo Valor
+            if (key === 'operador') {
+                renderRegrasCorModal();
+            }
+        });
+    }
+
+    if (filterEl) {
+        filterEl.addEventListener('input', function () {
+            renderPedidos(this.value, getRotasSelecionadas());
+            updateFiltroStatusUI();
+        });
+    }
+    if (btnRotasTodas && rotasCheckboxListEl) {
+        btnRotasTodas.addEventListener('click', function () {
+            rotasCheckboxListEl.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
+            renderPedidos(filterEl ? filterEl.value : '', getRotasSelecionadas());
+            updateFiltroStatusUI();
+            showToast('Filtro aplicado: todas as rotas.', 'info');
+        });
+    }
+    if (btnRotasNenhuma && rotasCheckboxListEl) {
+        btnRotasNenhuma.addEventListener('click', function () {
+            rotasCheckboxListEl.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+            renderPedidos(filterEl ? filterEl.value : '', getRotasSelecionadas());
+            updateFiltroStatusUI();
+            showToast('Filtro aplicado: nenhuma rota.', 'info');
+        });
+    }
+    if (btnLimparFiltros) {
+        btnLimparFiltros.addEventListener('click', function () {
+            if (filterEl) filterEl.value = '';
+            if (rotasCheckboxListEl) {
+                rotasCheckboxListEl.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
+            }
+            renderPedidos('', getRotasSelecionadas());
+            updateFiltroStatusUI();
+            showToast('Filtros limpos.', 'info');
+        });
+    }
+
+    function atualizarContadorArquivados() {
+        const total = pedidos.filter(p => p.arquivado).length;
+        const badge = document.getElementById('arquivadosBadge');
+        const btn = document.getElementById('btnVerArquivados');
+        if (badge) {
+            badge.textContent = total;
+            badge.style.display = total > 0 ? 'flex' : 'none';
+        }
+        if (btn) {
+            btn.title = total > 0 ? `Ver ${total} pedido(s) arquivado(s)` : 'Nenhum pedido arquivado';
+        }
+    }
+
+    async function arquivarPedido(pedidoId, restaurar) {
+        try {
+            const resp = await fetch(`${arquivarPedidoBaseUrl}${pedidoId}/arquivar/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+                body: JSON.stringify({ restaurar: restaurar }),
+            });
+            const data = await resp.json();
+            if (!resp.ok || !data.success) {
+                showToast(data.message || 'Erro ao processar pedido.', 'error');
+                return;
+            }
+            const pedido = pedidos.find(p => String(p.id) === String(pedidoId));
+            if (pedido) {
+                pedido.arquivado = !restaurar;
+            }
+            atualizarContadorArquivados();
+            renderPedidos(filterEl ? filterEl.value : '', getRotasSelecionadas());
+            showToast(data.message || (restaurar ? 'Pedido restaurado.' : 'Pedido arquivado.'), 'success');
+        } catch (e) {
+            showToast('Erro de conexão ao arquivar pedido.', 'error');
+        }
+    }
+
+    listEl.addEventListener('click', async function (event) {
+        // Botão Raio X
+        const btnRaioX = event.target.closest('.btn-info-raio-x');
+        if (btnRaioX) {
+            const pid = btnRaioX.getAttribute('data-raio-x-id');
+            const num = btnRaioX.getAttribute('data-raio-x-num');
+            const nome = btnRaioX.getAttribute('data-raio-x-nome');
+            const pd = pedidos.find(p => String(p.id) === String(pid));
+            window.openRaioX(pid, num, nome, pd || null);
+            return;
+        }
+
+        // Botão arquivar
+        const btnArquivar = event.target.closest('button[data-arquivar-id]');
+        if (btnArquivar) {
+            const pedidoId = btnArquivar.getAttribute('data-arquivar-id');
+            await arquivarPedido(pedidoId, false);
+            return;
+        }
+
+        // Botão restaurar
+        const btnRestaurar = event.target.closest('button[data-restaurar-id]');
+        if (btnRestaurar) {
+            const pedidoId = btnRestaurar.getAttribute('data-restaurar-id');
+            await arquivarPedido(pedidoId, true);
+            return;
+        }
+
+        // Botão adicionar à rota
+        const button = event.target.closest('button[data-add-rota]');
+        if (!button || button.disabled) return;
+
+        const pedidoId = button.getAttribute('data-add-rota');
+        if (!pedidoId) return;
+
+        const pedido = pedidos.find(p => String(p.id) === String(pedidoId));
+        if (!pedido) return;
+
+        if (pedido.importado) {
+            showToast('Esse pedido já foi convertido para rota no sistema.', 'error');
+            return;
+        }
+
+        if (typeof window.addPedidoToRoute !== 'function') {
+            showToast('Função de rota não carregada. Atualize a página e tente novamente.', 'error');
+            return;
+        }
+
+        const adicionou = window.addPedidoToRoute(pedido);
+        if (!adicionou) {
+            showToast('Pedido sem coordenadas válidas ou já adicionado na rota.', 'error');
+            return;
+        }
+
+        pedido.inRoute = true;
+        renderPedidos(filterEl ? filterEl.value : '', getRotasSelecionadas());
+        updateFiltroStatusUI();
+        showToast('Pedido adicionado à rota.', 'success');
+    });
+
+    window.addEventListener('pedido-removed-from-route', function (event) {
+        const pedidoId = event && event.detail ? event.detail.pedidoId : null;
+        if (!pedidoId) return;
+
+        const pedido = pedidos.find(p => String(p.id) === String(pedidoId));
+        if (!pedido) return;
+
+        pedido.inRoute = false;
+        renderPedidos(filterEl ? filterEl.value : '', getRotasSelecionadas());
+        updateFiltroStatusUI();
+        showToast('Pedido removido da rota e retornou para a lista.', 'info');
+    });
+
+    // Quando pedidos são salvos em uma rota, removê-los do painel (não devolver)
+    window.addEventListener('pedidos-saved-to-route', function (event) {
+        const pedidoIds = event && event.detail ? event.detail.pedidoIds : [];
+        if (!pedidoIds || !pedidoIds.length) return;
+        
+        const idsSet = new Set(pedidoIds.map(String));
+        // Remover pedidos salvos do array (não vão mais aparecer)
+        for (let i = pedidos.length - 1; i >= 0; i--) {
+            if (idsSet.has(String(pedidos[i].id))) {
+                pedidos.splice(i, 1);
+            }
+        }
+        renderPedidos(filterEl ? filterEl.value : '', getRotasSelecionadas());
+        updateFiltroStatusUI();
+    });
+
+    if (btnToggleRotas && rotasDropdownEl) {
+        btnToggleRotas.addEventListener('click', function (e) {
+            e.stopPropagation();
+            const open = rotasDropdownEl.classList.toggle('is-open');
+            if (!btnToggleRotas.classList.contains('is-filtrado')) {
+                btnToggleRotas.classList.toggle('is-open', open);
+            }
+        });
+        document.addEventListener('click', function (e) {
+            if (!rotasDropdownEl.contains(e.target) && e.target !== btnToggleRotas) {
+                rotasDropdownEl.classList.remove('is-open');
+                if (!btnToggleRotas.classList.contains('is-filtrado')) {
+                    btnToggleRotas.classList.remove('is-open');
+                }
+            }
+        });
+    }
+
+    if (panelEl && btnTelaCheia) {
+        btnTelaCheia.addEventListener('click', function () {
+            const expanded = panelEl.classList.toggle('fullscreen');
+            document.body.classList.toggle('pedidos-fullscreen', expanded);
+            btnTelaCheia.classList.toggle('is-active', expanded);
+            btnTelaCheia.textContent = expanded ? '🗗 Recolher' : '⛶ Tela cheia';
+            btnTelaCheia.title = expanded ? 'Recolher painel' : 'Expandir painel';
+            renderPedidos(filterEl ? filterEl.value : '', getRotasSelecionadas());
+        });
+    }
+
+    // Função para salvar rota a partir dos pontos do mapa
+    window.salvarRotaMapa = async function() {
+        if (typeof stops === 'undefined' || stops.length === 0) {
+            showToast('Adicione paradas no mapa para salvar a rota!', 'error');
+            return;
+        }
+
+        let nome;
+        let rotaId = null;
+        
+        // Se é uma rota reaberta, usar nome e ID existentes
+        if (rotaReabertaId) {
+            rotaId = rotaReabertaId;
+            nome = rotaReabertaNome || `Rota ${new Date().toLocaleDateString()}`;
+            // Permitir alterar o nome se quiser
+            const novoNome = prompt('Nome da rota:', nome);
+            if (novoNome === null) return; // Cancelou
+            nome = novoNome.trim() || nome;
+        } else {
+            nome = prompt('Nome da rota:', `Rota ${new Date().toLocaleDateString()}`);
+            if (!nome || nome.trim() === '') {
+                showToast('Nome da rota é obrigatório!', 'error');
+                return;
+            }
+            nome = nome.trim();
+        }
+
+        const distanciaEl = document.getElementById('total-dist');
+        const tempoEl = document.getElementById('total-time');
+        
+        const payload = {
+            nome: nome,
+            rota_id: rotaId,
+            paradas: stops.map((stop, index) => ({
+                sequencia: index + 1,
+                cliente_nome: stop.name || 'Cliente',
+                endereco: stop.address || '',
+                latitude: stop.lat,
+                longitude: stop.lng,
+                observacoes: stop.obs || '',
+                pedido_firebird_id: stop.sourcePedidoId || null
+            })),
+            distancia_total: distanciaEl ? parseFloat(distanciaEl.textContent) || null : null,
+            tempo_total: tempoEl ? parseInt(tempoEl.textContent) || null : null
+        };
+
+        try {
+            const response = await fetch("{% url 'rotas:salvar_rota_mapa' %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+            
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Erro ao salvar rota');
+            }
+
+            showToast(`✅ Rota "${nome}" salva com sucesso!`);
+            
+            // Limpar o painel de rotas (mapa) após salvar sem devolver pedidos
+            if (typeof clearMapAfterSave === 'function') {
+                clearMapAfterSave();
+            }
+            
+            // Perguntar se quer imprimir rota
+            if (confirm('Deseja imprimir esta rota agora?')) {
+                window.location.href = `/rotas/${data.rota_id}/layout-selector/`;
+            }
+        } catch (error) {
+            showToast(error.message || 'Erro ao salvar rota', 'error');
+        }
+    };
+
+    // Função para gerar PDF da rota
+    window.gerarPdfRota = async function(rotaId = null) {
+        // Se não passou ID, usar stops atuais do mapa
+        if (!rotaId) {
+            if (typeof stops === 'undefined' || stops.length === 0) {
+                showToast('Adicione paradas no mapa ou salve a rota primeiro!', 'error');
+                return;
+            }
+
+            // Criar PDF temporário com dados do mapa
+            const distanciaEl = document.getElementById('total-dist');
+            const tempoEl = document.getElementById('total-time');
+            
+            const payload = {
+                nome: `Rota ${new Date().toLocaleDateString()}`,
+                paradas: stops.map((stop, index) => ({
+                    sequencia: index + 1,
+                    cliente_nome: stop.name || 'Cliente',
+                    endereco: stop.address || '',
+                    observacoes: stop.obs || ''
+                })),
+                distancia_total: distanciaEl ? parseFloat(distanciaEl.textContent) || null : null,
+                tempo_total: tempoEl ? parseInt(tempoEl.textContent) || null : null
+            };
+
+            try {
+                const response = await fetch("{% url 'rotas:gerar_pdf_temporario' %}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken(),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error('Erro ao gerar PDF');
+                }
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `rota_${new Date().getTime()}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                showToast('📄 PDF gerado com sucesso!');
+            } catch (error) {
+                showToast('Erro ao gerar PDF', 'error');
+            }
+        } else {
+            // Redirecionar para seleção de layout da rota salva
+            window.location.href = `/rotas/${rotaId}/layout-selector/`;
+        }
+    };
+});
+</script>
+<script>
+    // Configurações dos cards de rota
+    window.rotasCardConfig = {
+        mostrar_numero: {% if config.rotas_card_mostrar_numero %}true{% else %}false{% endif %}
+    };
+    
+    // Configurações visuais completas dos cards de rota (para o painel de configuração)
+    window.rotasVisualConfigData = {
+        mostrar_numero: {% if config.rotas_card_mostrar_numero %}true{% else %}false{% endif %},
+        cor_fundo: '{{ config.rotas_card_cor_fundo|default:"#ffffff" }}',
+        cor_borda: '{{ config.rotas_card_cor_borda|default:"#dadce0" }}',
+        cor_numero: '{{ config.rotas_card_cor_numero|default:"#4285F4" }}',
+        tamanho_fonte: {{ config.rotas_card_tamanho_fonte|default:13 }},
+        padding_vertical: {{ config.rotas_card_padding_vertical|default:12 }},
+        padding_horizontal: {{ config.rotas_card_padding_horizontal|default:12 }},
+        raio: {{ config.rotas_card_raio|default:8 }}
+    };
+    
+    // Configuração de permissão de pedido em múltiplas rotas
+    window.permitirPedidoMultiplasRotas = {% if permitir_pedido_multiplas_rotas %}true{% else %}false{% endif %};
+    
+    // Motor de otimização selecionado ('local' | 'vroom' | 'ors')
+    window.FERMAP_MOTOR = '{{ otimizacao_motor|default:"local" }}';
+    window.routeFixedNamesApi = {
+        list: '{% url "rotas:listar_nomes_fixos_rota" %}',
+        save: '{% url "rotas:salvar_nome_fixo_rota" %}',
+        deleteBase: '{% url "rotas:deletar_nome_fixo_rota" pk=0 %}'.replace('/0/deletar/', '/')
+    };
+    (function() {
+        const el = document.getElementById('campos-busca-endereco-data');
+        let fields = [];
+        try { fields = el ? JSON.parse(el.textContent || '[]') : []; }
+        catch (e) { fields = []; }
+        window.routeAddressSearchConfig = { fields: Array.isArray(fields) ? fields : [] };
+    })();
+    window.routeMapsConfig = {
+        country: '{{ google_maps_search_country|default:"br"|escapejs }}',
+        scriptRequested: {% if google_maps_key %}true{% else %}false{% endif %},
+        settingsUrl: '{% url "rotas:configuracao_usuario" %}'
+    };
+
+    // Pontos fixos de partida e chegada
+    window.pontoFixoPartida = {% if config.ponto_partida_ativo %}{
+        configured: true,
+        lat: {{ config.ponto_partida_lat|unlocalize }},
+        lng: {{ config.ponto_partida_lng|unlocalize }},
+        name: '{{ config.ponto_partida_nome|default:"Ponto de Partida"|escapejs }}',
+        address: '{{ config.ponto_partida_nome|default:"Ponto de partida fixo"|escapejs }}'
+    }{% else %}null{% endif %};
+    window.pontoFixoFinal = {% if config.ponto_final_ativo %}{
+        configured: true,
+        lat: {{ config.ponto_final_lat|unlocalize }},
+        lng: {{ config.ponto_final_lng|unlocalize }},
+        name: '{{ config.ponto_final_nome|default:"Ponto Final"|escapejs }}',
+        address: '{{ config.ponto_final_nome|default:"Ponto final fixo"|escapejs }}'
+    }{% else %}null{% endif %};
+    
+    // Campos configurados para exibição nos cards de rota (vêm do banco)
+    (function() {
+        const el = document.getElementById('campos-exibicao-rotas-data');
+        window.rotasCamposExibicao = el ? JSON.parse(el.textContent || '[]') : [];
+    })();
+    
+    // Regras de cor para os cards de rota
+    (function() {
+        const el = document.getElementById('regras-cor-rotas-data');
+        window.rotasRegrasCor = el ? JSON.parse(el.textContent || '[]') : [];
+    })();
+</script>
+<script>
+(function() {
+    var el = document.getElementById('campos-sql-disponiveis-data');
+    try { window._fermap_campos_sql = el ? JSON.parse(el.textContent) : []; }
+    catch(e) { window._fermap_campos_sql = []; }
+})();
+</script>
+<script src="{% static 'js/route_engine.js' %}?v={{ request.user.id }}{{ config.id }}1"></script>
+<script src="{% static 'js/app.js' %}?v={{ request.user.id }}{{ config.id }}12"></script>
+<script>
+// Painel de botões + busca retrátil
+function toggleBtnGrid() {
+    var content = document.getElementById('btnGridContent');
+    var search = document.getElementById('searchAreaContent');
+    var arrow = document.getElementById('btnGridArrow');
+    if (!content) return;
+    var isOpen = !content.classList.contains('collapsed');
+    content.classList.toggle('collapsed', isOpen);
+    if (search) search.classList.toggle('collapsed', isOpen);
+    if (arrow) arrow.classList.toggle('collapsed', isOpen);
+    try { localStorage.setItem('logistica_btngrid_open', isOpen ? '0' : '1'); } catch(e) {}
+}
+// Restaurar estado ao carregar
+(function() {
+    var saved = localStorage.getItem('logistica_btngrid_open');
+    if (saved === '0') {
+        var c = document.getElementById('btnGridContent');
+        var s = document.getElementById('searchAreaContent');
+        var a = document.getElementById('btnGridArrow');
+        if (c) c.classList.add('collapsed');
+        if (s) s.classList.add('collapsed');
+        if (a) a.classList.add('collapsed');
+    }
+})();
+</script>
+
+
+<!-- ═══ Raio X do Cliente (React) ═══ -->
+<div id="raio-x-root"></div>
+<script type="module" src="{% static 'raio-x/raio-x.js' %}"></script>
+<script>
+window.openRaioX = function(pedidoId, numeroPedido, clienteNome, pedidoData) {
+    window.dispatchEvent(new CustomEvent('open-raio-x', {
+        detail: { pedidoId: pedidoId, numeroPedido: numeroPedido, clienteNome: clienteNome, pedidoData: pedidoData }
+    }));
+};
+window.closeRaioX = function() {
+    window.dispatchEvent(new CustomEvent('close-raio-x'));
+};
+</script>
+
+
+<div id="colorPalettePopup">
+    <div class="palette-title">
+        <span>🎨 Escolher cor</span>
+        <button class="palette-close-btn" id="btnClosePalette">×</button>
+    </div>
+    <div class="palette-grid" id="paletteSwatchGrid"></div>
+    <div class="palette-custom-row">
+        <input type="color" id="paletteCustomColor" value="#000000">
+        <button class="palette-custom-apply" id="paletteCustomApply">Aplicar cor personalizada</button>
+    </div>
+</div>
+
+<script>
+(function() {
+    const COLOR_PALETTE_COLORS = [
+        '#ffffff','#f8fafc','#f1f5f9','#e2e8f0','#cbd5e1','#94a3b8',
+        '#64748b','#475569','#334155','#1e293b','#0f172a','#000000',
+        '#fef2f2','#fecaca','#f87171','#ef4444','#dc2626','#991b1b',
+        '#fff7ed','#fed7aa','#fb923c','#f97316','#ea580c','#9a3412',
+        '#fefce8','#fef08a','#facc15','#eab308','#ca8a04','#854d0e',
+        '#f0fdf4','#bbf7d0','#4ade80','#22c55e','#16a34a','#14532d',
+        '#f0fdfa','#99f6e4','#2dd4bf','#14b8a6','#0d9488','#134e4a',
+        '#eff6ff','#bfdbfe','#60a5fa','#3b82f6','#2563eb','#1e3a8a',
+        '#faf5ff','#e9d5ff','#c084fc','#a855f7','#9333ea','#581c87',
+        '#fdf2f8','#fbcfe8','#f472b6','#ec4899','#db2777','#831843',
+    ];
+
+    let _paletteCallback = null;
+
+    window.openColorPalette = function(anchorEl, callback) {
+        _paletteCallback = callback;
+        const popup = document.getElementById('colorPalettePopup');
+        const grid = document.getElementById('paletteSwatchGrid');
+        grid.innerHTML = COLOR_PALETTE_COLORS.map(c =>
+            `<div class="palette-swatch" style="background:${c};" data-color="${c}" title="${c}"></div>`
+        ).join('');
+        grid.querySelectorAll('.palette-swatch').forEach(function(sw) {
+            sw.addEventListener('click', function() {
+                if (_paletteCallback) _paletteCallback(sw.getAttribute('data-color'));
+                window.closeColorPalette();
+            });
+        });
+        const rect = anchorEl.getBoundingClientRect();
+        popup.style.top = (rect.bottom + 4) + 'px';
+        popup.style.left = Math.min(rect.left, window.innerWidth - 220) + 'px';
+        popup.classList.add('open');
+    };
+
+    window.closeColorPalette = function() {
+        const popup = document.getElementById('colorPalettePopup');
+        if (popup) popup.classList.remove('open');
+        _paletteCallback = null;
+    };
+
+    document.getElementById('btnClosePalette').addEventListener('click', window.closeColorPalette);
+
+    document.getElementById('paletteCustomApply').addEventListener('click', function() {
+        const c = document.getElementById('paletteCustomColor').value;
+        if (_paletteCallback) _paletteCallback(c);
+        window.closeColorPalette();
+    });
+
+    document.addEventListener('click', function(e) {
+        const popup = document.getElementById('colorPalettePopup');
+        if (popup && popup.classList.contains('open') &&
+            !popup.contains(e.target) &&
+            !e.target.classList.contains('btn-palette-open')) {
+            window.closeColorPalette();
+        }
+    });
+})();
+</script>
+
+</body>
+</html>

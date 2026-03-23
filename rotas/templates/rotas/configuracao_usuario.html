@@ -1,0 +1,618 @@
+{% load static l10n %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configurações - Fermap Logística</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Roboto', sans-serif; background: #f5f5f5; }
+        
+        nav { background: #202124; color: white; padding: 15px; display: flex; justify-content: space-between; }
+        nav a { color: white; text-decoration: none; margin: 0 15px; }
+        
+        .container { max-width: 700px; margin: 30px auto; padding: 0 20px; }
+        
+        .form-card { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        
+        h1 { color: #202124; margin-bottom: 20px; }
+        
+        h2 { color: #4285F4; font-size: 16px; margin-top: 30px; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #4285F4; }
+        
+        .form-group { margin-bottom: 15px; }
+        
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #333; font-size: 13px; }
+        
+        input, textarea { width: 100%; padding: 10px; border: 1px solid #dadce0; border-radius: 4px; font-family: 'Roboto', sans-serif; }
+        input:focus, textarea:focus { outline: none; border-color: #4285F4; box-shadow: 0 0 5px rgba(66,133,244,0.3); }
+        
+        .checkbox-group { display: flex; align-items: center; gap: 10px; }
+        input[type="checkbox"] { width: auto; }
+        
+        .btn { padding: 12px 30px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; }
+        .btn-submit { background: #4285F4; color: white; }
+        .btn-submit:hover { background: #2f6ad4; }
+        
+        .info-text { font-size: 12px; color: #999; margin-top: 3px; }
+    </style>
+</head>
+<body>
+
+<nav>
+    <strong style="font-size: 18px;">Fermap Logística</strong>
+    <div>
+        <a href="/rotas/">Minhas Rotas</a>
+        <a href="/admin/logout/">Sair</a>
+    </div>
+</nav>
+
+<div class="container">
+    <div class="form-card">
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
+            <a href="/" style="display:inline-flex; align-items:center; gap:6px; padding:8px 14px; background:#f1f3f4; border-radius:6px; text-decoration:none; color:#444; font-size:13px; font-weight:600;">
+                ← Voltar
+            </a>
+            <h1 style="margin:0;">⚙️ Configurações da Conta</h1>
+        </div>
+        
+        <form method="POST">
+            {% csrf_token %}
+            
+            <h2>Informações da Empresa</h2>
+            
+            <div class="form-group">
+                <label for="nome_empresa">Nome da Empresa</label>
+                <input type="text" id="nome_empresa" name="nome_empresa" value="{{ config.nome_empresa }}" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="telefone_empresa">Telefone</label>
+                <input type="tel" id="telefone_empresa" name="telefone_empresa" value="{{ config.telefone_empresa }}">
+                <div class="info-text">Formato: (XX) 9XXXX-XXXX</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="email_empresa">Email</label>
+                <input type="email" id="email_empresa" name="email_empresa" value="{{ config.email_empresa }}">
+            </div>
+            
+            <h2>Localização Padrão</h2>
+            
+            <div class="form-group">
+                <label for="localizacao_padrao_lat">Latitude</label>
+                <input type="number" id="localizacao_padrao_lat" name="localizacao_padrao_lat" step="any" value="{{ config.localizacao_padrao_lat|unlocalize }}">
+                <div class="info-text">Exemplo: -0.034987</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="localizacao_padrao_lng">Longitude</label>
+                <input type="number" id="localizacao_padrao_lng" name="localizacao_padrao_lng" step="any" value="{{ config.localizacao_padrao_lng|unlocalize }}">
+                <div class="info-text">Exemplo: -51.074846</div>
+            </div>
+
+            <h2>Pontos Fixos da Rota</h2>
+
+            <div class="form-group">
+                <label for="ponto_partida_nome">Ponto de Partida - Nome</label>
+                <input type="text" id="ponto_partida_nome" name="ponto_partida_nome" placeholder="Ex: Galpão Central, Sede..." value="{{ config.ponto_partida_nome }}">
+            </div>
+            <div class="form-group">
+                <label for="ponto_partida_lat">Ponto de Partida - Latitude</label>
+                <input type="number" id="ponto_partida_lat" name="ponto_partida_lat" step="any" value="{{ config.ponto_partida_lat|unlocalize }}">
+            </div>
+            <div class="form-group">
+                <label for="ponto_partida_lng">Ponto de Partida - Longitude</label>
+                <input type="number" id="ponto_partida_lng" name="ponto_partida_lng" step="any" value="{{ config.ponto_partida_lng|unlocalize }}">
+            </div>
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="ponto_partida_ativo" name="ponto_partida_ativo" {% if config.ponto_partida_ativo %}checked{% endif %}>
+                <label for="ponto_partida_ativo" style="margin: 0;">Usar como <strong>ponto zero fixo</strong> em todas as rotas</label>
+            </div>
+
+            <div class="form-group">
+                <label for="ponto_final_nome">Ponto Final - Nome</label>
+                <input type="text" id="ponto_final_nome" name="ponto_final_nome" placeholder="Ex: Depósito, Retorno..." value="{{ config.ponto_final_nome }}">
+            </div>
+            <div class="form-group">
+                <label for="ponto_final_lat">Ponto Final - Latitude</label>
+                <input type="number" id="ponto_final_lat" name="ponto_final_lat" step="any" value="{{ config.ponto_final_lat|unlocalize }}">
+            </div>
+            <div class="form-group">
+                <label for="ponto_final_lng">Ponto Final - Longitude</label>
+                <input type="number" id="ponto_final_lng" name="ponto_final_lng" step="any" value="{{ config.ponto_final_lng|unlocalize }}">
+            </div>
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="ponto_final_ativo" name="ponto_final_ativo" {% if config.ponto_final_ativo %}checked{% endif %}>
+                <label for="ponto_final_ativo" style="margin: 0;">Usar como <strong>ponto final fixo</strong> em todas as rotas</label>
+            </div>
+            
+            <h2>Preferências</h2>
+            
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="usar_otimizacao_automatica" name="usar_otimizacao_automatica" {% if config.usar_otimizacao_automatica %}checked{% endif %}>
+                <label for="usar_otimizacao_automatica" style="margin: 0;">Usar otimização automática de rotas</label>
+            </div>
+
+            <div style="margin-top: 16px;">
+                <label style="font-weight: 600; display: block; margin-bottom: 10px;">⚙️ Motor de Otimização de Rotas</label>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer;">
+                        <input type="radio" name="otimizacao_motor" value="local" {% if config.otimizacao_motor == 'local' or not config.otimizacao_motor %}checked{% endif %} onchange="document.getElementById('ors-key-group').style.display='none'" style="margin-top: 2px;">
+                        <span><strong>Local (B&amp;B)</strong><br><small style="color:#666;">Cálculo interno usando distâncias reais OSRM + Branch &amp; Bound. Sem dependência externa. Até 12 paradas: ótimo; &gt;12: heurística.</small></span>
+                    </label>
+                    <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer;">
+                        <input type="radio" name="otimizacao_motor" value="vroom" {% if config.otimizacao_motor == 'vroom' %}checked{% endif %} onchange="document.getElementById('ors-key-group').style.display='none'" style="margin-top: 2px;">
+                        <span><strong>Vroom</strong><br><small style="color:#666;">Solver VRP profissional gratuito (solver.vroom-project.org). Sem chave de API. Excelente para &gt;12 paradas.</small></span>
+                    </label>
+                    <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer;">
+                        <input type="radio" name="otimizacao_motor" value="ors" {% if config.otimizacao_motor == 'ors' %}checked{% endif %} onchange="document.getElementById('ors-key-group').style.display='block'" style="margin-top: 2px;">
+                        <span><strong>OpenRouteService</strong><br><small style="color:#666;">API profissional com distâncias reais de estrada (api.openrouteservice.org). Requer chave gratuita (2.000 req/dia).</small></span>
+                    </label>
+                </div>
+                <div id="ors-key-group" style="margin-top: 12px; {% if config.otimizacao_motor != 'ors' %}display:none;{% endif %}">
+                    <label for="ors_api_key">Chave API OpenRouteService</label>
+                    <input type="text" id="ors_api_key" name="ors_api_key" placeholder="Cole aqui sua API Key..." value="{{ config.ors_api_key }}" style="font-family: monospace;">
+                    <small style="color:#888;">Obtenha gratuitamente em <a href="https://openrouteservice.org/dev/#/signup" target="_blank">openrouteservice.org</a></small>
+                </div>
+            </div>
+
+            <div style="margin-top: 20px; padding: 16px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px;">
+                <label style="font-weight: 600; display: block; margin-bottom: 10px;">🗺️ Google Maps e Busca por Endereço</label>
+                <div class="form-group">
+                    <label for="google_maps_api_key">Chave API Google Maps</label>
+                    <input type="text" id="google_maps_api_key" name="google_maps_api_key" placeholder="Cole aqui sua API Key do Google Maps..." value="{{ config.google_maps_api_key }}" style="font-family: monospace;">
+                    <div class="info-text">Se deixar em branco, o sistema tentará usar a chave global atual.{% if google_maps_global_configured %} Há uma chave global configurada como fallback.{% endif %}</div>
+                </div>
+                <div class="form-group">
+                    <label for="google_maps_search_country">País padrão da busca</label>
+                    <input type="text" id="google_maps_search_country" name="google_maps_search_country" maxlength="10" value="{{ config.google_maps_search_country|default:'br' }}" placeholder="Ex: br" style="text-transform: lowercase; font-family: monospace;">
+                    <div class="info-text">Use o código do país para priorizar a busca de endereços. Exemplo: br.</div>
+                </div>
+                <div style="font-size:12px; color:#475569; line-height:1.5;">
+                    APIs necessárias no Google Cloud:
+                    <br>1. Maps JavaScript API
+                    <br>2. Places API
+                    <br>3. Geocoding API
+                    <br><br>A chave atualmente resolvida para esta conta está {% if google_maps_key_resolved %}disponível{% else %}vazia{% endif %}.
+                </div>
+            </div>
+            
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="permitir_compartilhamento" name="permitir_compartilhamento" {% if config.permitir_compartilhamento %}checked{% endif %}>
+                <label for="permitir_compartilhamento" style="margin: 0;">Permitir compartilhamento de rotas</label>
+            </div>
+
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="permitir_pedidos_sem_coordenadas" name="permitir_pedidos_sem_coordenadas" {% if config.permitir_pedidos_sem_coordenadas %}checked{% endif %}>
+                <label for="permitir_pedidos_sem_coordenadas" style="margin: 0;">Permitir incluir pedidos sem coordenadas (usa ponto padrão para ajuste manual)</label>
+            </div>
+
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="permitir_pedido_multiplas_rotas" name="permitir_pedido_multiplas_rotas" {% if config.permitir_pedido_multiplas_rotas %}checked{% endif %}>
+                <label for="permitir_pedido_multiplas_rotas" style="margin: 0;">Permitir que o mesmo pedido seja adicionado em múltiplas rotas</label>
+            </div>
+
+            <h2>Filtros de Exclusão de Pedidos</h2>
+            <p style="font-size:13px; color:#555; margin-bottom:12px;">
+                Defina regras para <strong>excluir automaticamente</strong> pedidos do painel. Pedidos que atendam às condições abaixo não serão exibidos.
+            </p>
+
+            <div id="filtros-exclusao-container" style="margin-bottom:12px;"></div>
+
+            <button type="button" id="btn-add-filtro-exclusao" style="padding:6px 14px; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; cursor:pointer; font-size:13px; margin-bottom:16px;">
+                + Adicionar Regra
+            </button>
+            <button type="button" id="btn-salvar-filtros-exclusao" style="padding:6px 18px; background:#2563eb; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:13px; margin-left:8px; margin-bottom:16px;">
+                Salvar Filtros
+            </button>
+            <span id="filtros-exclusao-msg" style="font-size:12px; margin-left:10px;"></span>
+
+            {{ campos_sql|json_script:"fex-campos-data" }}
+            {{ filtros_exclusao_pedidos|json_script:"fex-filtros-data" }}
+            <script>
+            (function(){
+                const camposDisponiveis = JSON.parse(document.getElementById('fex-campos-data').textContent || '[]');
+                const operadores = [
+                    {val:'igual', label:'igual a'},
+                    {val:'diferente', label:'diferente de'},
+                    {val:'contem', label:'contém'},
+                    {val:'nao_contem', label:'não contém'},
+                    {val:'maior', label:'maior que'},
+                    {val:'maior_igual', label:'maior ou igual a'},
+                    {val:'menor', label:'menor que'},
+                    {val:'menor_igual', label:'menor ou igual a'},
+                    {val:'vazio', label:'está vazio'},
+                    {val:'nao_vazio', label:'não está vazio'},
+                ];
+                const opsSemValor = new Set(['vazio','nao_vazio']);
+                let filtros = JSON.parse(document.getElementById('fex-filtros-data').textContent || '[]');
+                const container = document.getElementById('filtros-exclusao-container');
+                const salvarUrl = "{% url 'rotas:salvar_filtros_exclusao' %}";
+                const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+                function buildCampoSelect(valor){
+                    let s = '<select class="fex-campo" style="flex:2; padding:5px; border:1px solid #ddd; border-radius:4px; font-size:12px;">';
+                    s += '<option value="">-- Campo --</option>';
+                    camposDisponiveis.forEach(c => {
+                        s += `<option value="${c}" ${c===valor?'selected':''}>${c}</option>`;
+                    });
+                    s += '</select>';
+                    return s;
+                }
+
+                function buildOpSelect(valor){
+                    let s = '<select class="fex-op" style="flex:2; padding:5px; border:1px solid #ddd; border-radius:4px; font-size:12px;">';
+                    operadores.forEach(o => {
+                        s += `<option value="${o.val}" ${o.val===valor?'selected':''}>${o.label}</option>`;
+                    });
+                    s += '</select>';
+                    return s;
+                }
+
+                function renderFiltros(){
+                    container.innerHTML = '';
+                    if(filtros.length === 0){
+                        container.innerHTML = '<p style="font-size:13px;color:#888;font-style:italic;">Nenhum filtro configurado.</p>';
+                        return;
+                    }
+                    filtros.forEach((f, i) => {
+                        const semValor = opsSemValor.has(f.operador || 'igual');
+                        const row = document.createElement('div');
+                        row.style.cssText = 'display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;';
+                        row.dataset.index = i;
+                        row.innerHTML = `
+                            <input type="checkbox" class="fex-ativo" ${f.ativo!==false?'checked':''} title="Ativo" style="width:auto;">
+                            ${buildCampoSelect(f.campo||'')}
+                            ${buildOpSelect(f.operador||'igual')}
+                            <input type="text" class="fex-valor" value="${(f.valor||'').replace(/"/g,'&quot;')}"
+                                placeholder="Valor" ${semValor?'disabled style="flex:1.5; padding:5px; border:1px solid #ddd; border-radius:4px; font-size:12px; background:#f3f4f6;"':'style="flex:1.5; padding:5px; border:1px solid #ddd; border-radius:4px; font-size:12px;"'}>
+                            <button type="button" class="fex-rem" data-i="${i}" title="Remover" style="padding:4px 10px; background:#fee2e2; border:1px solid #fca5a5; border-radius:4px; cursor:pointer; font-size:12px; color:#dc2626;">✕</button>
+                        `;
+                        // Op change — toggle valor field
+                        row.querySelector('.fex-op').addEventListener('change', function(){
+                            const inp = row.querySelector('.fex-valor');
+                            if(opsSemValor.has(this.value)){
+                                inp.disabled = true;
+                                inp.style.background = '#f3f4f6';
+                                inp.value = '';
+                            } else {
+                                inp.disabled = false;
+                                inp.style.background = '';
+                            }
+                            updateFiltroFromRow(row, i);
+                        });
+                        row.querySelector('.fex-campo').addEventListener('change', () => updateFiltroFromRow(row, i));
+                        row.querySelector('.fex-valor').addEventListener('input', () => updateFiltroFromRow(row, i));
+                        row.querySelector('.fex-ativo').addEventListener('change', () => updateFiltroFromRow(row, i));
+                        row.querySelector('.fex-rem').addEventListener('click', function(){
+                            filtros.splice(parseInt(this.dataset.i), 1);
+                            renderFiltros();
+                        });
+                        container.appendChild(row);
+                    });
+                }
+
+                function updateFiltroFromRow(row, i){
+                    filtros[i] = {
+                        campo: row.querySelector('.fex-campo').value,
+                        operador: row.querySelector('.fex-op').value,
+                        valor: row.querySelector('.fex-valor').value,
+                        ativo: row.querySelector('.fex-ativo').checked,
+                    };
+                }
+
+                document.getElementById('btn-add-filtro-exclusao').addEventListener('click', function(){
+                    filtros.push({campo:'', operador:'igual', valor:'', ativo:true});
+                    renderFiltros();
+                });
+
+                document.getElementById('btn-salvar-filtros-exclusao').addEventListener('click', function(){
+                    const msg = document.getElementById('filtros-exclusao-msg');
+                    // Sync all rows before saving
+                    container.querySelectorAll('[data-index]').forEach(row => {
+                        const i = parseInt(row.dataset.index);
+                        updateFiltroFromRow(row, i);
+                    });
+                    fetch(salvarUrl, {
+                        method: 'POST',
+                        headers: {'Content-Type':'application/json', 'X-CSRFToken': csrfToken},
+                        body: JSON.stringify({filtros: filtros}),
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        if(data.success){
+                            filtros = data.filtros;
+                            renderFiltros();
+                            msg.textContent = '✓ Salvo!';
+                            msg.style.color = '#16a34a';
+                        } else {
+                            msg.textContent = 'Erro: ' + (data.message || 'Falha ao salvar.');
+                            msg.style.color = '#dc2626';
+                        }
+                        setTimeout(() => { msg.textContent = ''; }, 3000);
+                    })
+                    .catch(() => {
+                        msg.textContent = 'Erro de conexão.';
+                        msg.style.color = '#dc2626';
+                    });
+                });
+
+                renderFiltros();
+            })();
+            </script>
+
+            <h2>Arquivamento Automático de Pedidos</h2>
+            <p style="font-size:13px; color:#555; margin-bottom:12px;">
+                Defina regras para <strong>arquivar automaticamente</strong> pedidos em intervalos configuráveis.
+                Pedidos arquivados ficam na aba <em>Arquivados</em> e podem ser desarquivados manualmente.
+                Estas regras são <strong>globais</strong> para todos os usuários do sistema.
+            </p>
+            <div style="background:#fffbeb; border:1px solid #fcd34d; border-radius:6px; padding:10px 14px; margin-bottom:14px; font-size:12px; color:#92400e;">
+                💡 Use <strong>há mais de N dias</strong> para arquivar pedidos antigos. Ex: campo <code>data_importacao</code>, operador <em>há mais de</em>, valor <code>15</code>.
+            </div>
+
+            <div style="display:flex; align-items:center; gap:16px; margin-bottom:14px; flex-wrap:wrap;">
+                <label style="font-size:13px; font-weight:600; color:#374151;">
+                    ⏱ Intervalo de execução:
+                    <input type="number" id="arq-intervalo" min="1" max="8760"
+                        value="{{ intervalo_arquivamento_horas }}"
+                        style="width:70px; padding:5px 8px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; margin-left:6px;">
+                    horas
+                </label>
+                {% if ultima_execucao_arquivamento %}
+                <span id="arq-ultima" style="font-size:12px; color:#6b7280;">
+                    Última execução: <strong>{{ ultima_execucao_arquivamento }}</strong>
+                </span>
+                {% else %}
+                <span id="arq-ultima" style="font-size:12px; color:#6b7280;">Última execução: <em>nunca</em></span>
+                {% endif %}
+            </div>
+
+            <div id="arq-container" style="margin-bottom:12px;"></div>
+
+            <button type="button" id="btn-add-arq" style="padding:6px 14px; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; cursor:pointer; font-size:13px; margin-bottom:16px;">
+                + Adicionar Regra
+            </button>
+            <button type="button" id="btn-salvar-arq" style="padding:6px 18px; background:#d97706; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:13px; margin-left:8px; margin-bottom:16px;">
+                Salvar Regras
+            </button>
+            <button type="button" id="btn-executar-arq" style="padding:6px 18px; background:#1d4ed8; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:13px; margin-left:8px; margin-bottom:16px;" title="Executa o arquivamento agora, ignorando o intervalo">
+                ▶ Executar Agora
+            </button>
+            <span id="arq-msg" style="font-size:12px; margin-left:10px;"></span>
+
+            {{ regras_arquivamento|json_script:"arq-regras-data" }}
+            <script>
+            (function(){
+                const camposArq = JSON.parse(document.getElementById('fex-campos-data').textContent || '[]');
+                const operadoresArq = [
+                    {val:'igual', label:'igual a'},
+                    {val:'diferente', label:'diferente de'},
+                    {val:'contem', label:'contém'},
+                    {val:'nao_contem', label:'não contém'},
+                    {val:'maior', label:'maior que'},
+                    {val:'maior_igual', label:'maior ou igual a'},
+                    {val:'menor', label:'menor que'},
+                    {val:'menor_igual', label:'menor ou igual a'},
+                    {val:'ha_mais_de', label:'há mais de (dias)'},
+                    {val:'ha_menos_de', label:'há menos de (dias)'},
+                    {val:'vazio', label:'está vazio'},
+                    {val:'nao_vazio', label:'não está vazio'},
+                ];
+                const arqOpsSemValor = new Set(['vazio','nao_vazio']);
+                let regrasArq = JSON.parse(document.getElementById('arq-regras-data').textContent || '[]');
+                const containerArq = document.getElementById('arq-container');
+                const salvarArqUrl = "{% url 'rotas:salvar_regras_arquivamento' %}";
+                const executarArqUrl = "{% url 'rotas:executar_arquivamento_agora' %}";
+                const csrfArq = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+                function buildArqCampoSelect(valor){
+                    let s = '<select class="arq-campo" style="flex:2; padding:5px; border:1px solid #ddd; border-radius:4px; font-size:12px;">';
+                    s += '<option value="">-- Campo --</option>';
+                    camposArq.forEach(c => {
+                        s += `<option value="${c}" ${c===valor?'selected':''}>${c}</option>`;
+                    });
+                    s += '</select>';
+                    return s;
+                }
+
+                function buildArqOpSelect(valor){
+                    let s = '<select class="arq-op" style="flex:2; padding:5px; border:1px solid #ddd; border-radius:4px; font-size:12px;">';
+                    operadoresArq.forEach(o => {
+                        s += `<option value="${o.val}" ${o.val===valor?'selected':''}>${o.label}</option>`;
+                    });
+                    s += '</select>';
+                    return s;
+                }
+
+                function renderArq(){
+                    containerArq.innerHTML = '';
+                    if(regrasArq.length === 0){
+                        containerArq.innerHTML = '<p style="font-size:13px;color:#888;font-style:italic;">Nenhuma regra configurada.</p>';
+                        return;
+                    }
+                    regrasArq.forEach((r, i) => {
+                        const semValor = arqOpsSemValor.has(r.operador || 'igual');
+                        const row = document.createElement('div');
+                        row.style.cssText = 'display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;';
+                        row.dataset.index = i;
+                        row.innerHTML = `
+                            <input type="checkbox" class="arq-ativo" ${r.ativo!==false?'checked':''} title="Ativo" style="width:auto;">
+                            ${buildArqCampoSelect(r.campo||'')}
+                            ${buildArqOpSelect(r.operador||'igual')}
+                            <input type="text" class="arq-valor" value="${(r.valor||'').replace(/"/g,'&quot;')}"
+                                placeholder="Valor" ${semValor?'disabled style="flex:1; padding:5px; border:1px solid #ddd; border-radius:4px; font-size:12px; background:#f3f4f6;"':'style="flex:1; padding:5px; border:1px solid #ddd; border-radius:4px; font-size:12px;"'}>
+                            <label style="font-size:11px; color:#6b7280; white-space:nowrap;" title="0 = sem exclus\u00e3o autom\u00e1tica">
+                                Quarentena:<input type="number" class="arq-quarentena" min="0" max="3650" value="${parseInt(r.dias_quarentena||0)||0}" style="width:52px; padding:4px 5px; border:1px solid #ddd; border-radius:4px; font-size:12px; margin-left:4px;"> dias
+                            </label>
+                            <button type="button" class="arq-rem" data-i="${i}" style="padding:4px 10px; background:#fee2e2; border:1px solid #fca5a5; border-radius:4px; cursor:pointer; font-size:12px; color:#dc2626;">✕</button>
+                        `;
+                        row.querySelector('.arq-op').addEventListener('change', function(){
+                            const inp = row.querySelector('.arq-valor');
+                            if(arqOpsSemValor.has(this.value)){
+                                inp.disabled = true; inp.style.background = '#f3f4f6'; inp.value = '';
+                            } else {
+                                inp.disabled = false; inp.style.background = '';
+                            }
+                            updateArqFromRow(row, i);
+                        });
+                        row.querySelector('.arq-campo').addEventListener('change', () => updateArqFromRow(row, i));
+                        row.querySelector('.arq-valor').addEventListener('input', () => updateArqFromRow(row, i));
+                        row.querySelector('.arq-ativo').addEventListener('change', () => updateArqFromRow(row, i));
+                        row.querySelector('.arq-quarentena').addEventListener('input', () => updateArqFromRow(row, i));
+                        row.querySelector('.arq-rem').addEventListener('click', function(){
+                            regrasArq.splice(parseInt(this.dataset.i), 1);
+                            renderArq();
+                        });
+                        containerArq.appendChild(row);
+                    });
+                }
+
+                function updateArqFromRow(row, i){
+                    regrasArq[i] = {
+                        campo: row.querySelector('.arq-campo').value,
+                        operador: row.querySelector('.arq-op').value,
+                        valor: row.querySelector('.arq-valor').value,
+                        ativo: row.querySelector('.arq-ativo').checked,
+                        dias_quarentena: parseInt(row.querySelector('.arq-quarentena').value) || 0,
+                    };
+                }
+
+                document.getElementById('btn-add-arq').addEventListener('click', function(){
+                    regrasArq.push({campo:'', operador:'igual', valor:'', ativo:true, dias_quarentena:0});
+                    renderArq();
+                });
+
+                document.getElementById('btn-salvar-arq').addEventListener('click', function(){
+                    const msg = document.getElementById('arq-msg');
+                    containerArq.querySelectorAll('[data-index]').forEach(row => {
+                        updateArqFromRow(row, parseInt(row.dataset.index));
+                    });
+                    const intervaloVal = parseInt(document.getElementById('arq-intervalo').value) || 24;
+                    const intervaloQVal = parseInt(document.getElementById('arq-quarentena-intervalo').value) || 24;
+                    fetch(salvarArqUrl, {
+                        method: 'POST',
+                        headers: {'Content-Type':'application/json', 'X-CSRFToken': csrfArq},
+                        body: JSON.stringify({regras: regrasArq, intervalo_horas: intervaloVal, intervalo_quarentena_horas: intervaloQVal}),
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        if(data.success){
+                            regrasArq = data.regras;
+                            renderArq();
+                            msg.textContent = '✓ Salvo!';
+                            msg.style.color = '#16a34a';
+                        } else {
+                            msg.textContent = 'Erro: ' + (data.message || 'Falha ao salvar.');
+                            msg.style.color = '#dc2626';
+                        }
+                        setTimeout(() => { msg.textContent = ''; }, 3000);
+                    })
+                    .catch(() => { msg.textContent = 'Erro de conexão.'; msg.style.color = '#dc2626'; });
+                });
+
+                document.getElementById('btn-executar-arq').addEventListener('click', function(){
+                    const btn = this;
+                    const msg = document.getElementById('arq-msg');
+                    btn.disabled = true;
+                    btn.textContent = 'Executando...';
+                    fetch(executarArqUrl, {
+                        method: 'POST',
+                        headers: {'Content-Type':'application/json', 'X-CSRFToken': csrfArq},
+                        body: '{}',
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        if(data.success){
+                            msg.textContent = `✓ ${data.arquivados} pedido(s) arquivado(s).`;
+                            msg.style.color = '#16a34a';
+                            const ultimaEl = document.getElementById('arq-ultima');
+                            if(ultimaEl) ultimaEl.innerHTML = `Última execução: <strong>${data.ultima_execucao}</strong>`;
+                        } else {
+                            msg.textContent = 'Erro ao executar.';
+                            msg.style.color = '#dc2626';
+                        }
+                        setTimeout(() => { msg.textContent = ''; }, 4000);
+                    })
+                    .catch(() => { msg.textContent = 'Erro de conexão.'; msg.style.color = '#dc2626'; })
+                    .finally(() => { btn.disabled = false; btn.textContent = '▶ Executar Agora'; });
+                });
+
+                renderArq();
+            })();
+            </script>
+
+            <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:8px; padding:14px 18px; margin-top:18px;">
+                <h3 style="font-size:14px; font-weight:700; color:#166534; margin:0 0 10px 0;">🗑 Quarentena — Exclusão Automática</h3>
+                <p style="font-size:12px; color:#166534; margin-bottom:10px;">
+                    Pedidos arquivados com prazo de quarentena definido serão <strong>excluídos permanentemente</strong>
+                    após o número de dias configurado em cada regra acima (0 = nunca excluir).
+                </p>
+                <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+                    <label style="font-size:13px; font-weight:600; color:#374151;">
+                        ⏱ Verificar a cada:
+                        <input type="number" id="arq-quarentena-intervalo" min="1" max="8760"
+                            value="{{ intervalo_quarentena_horas }}"
+                            style="width:70px; padding:5px 8px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; margin-left:6px;"> horas
+                    </label>
+                    {% if ultima_execucao_quarentena %}
+                    <span id="arq-q-ultima" style="font-size:12px; color:#6b7280;">
+                        Última: <strong>{{ ultima_execucao_quarentena }}</strong>
+                    </span>
+                    {% else %}
+                    <span id="arq-q-ultima" style="font-size:12px; color:#6b7280;">Última: <em>nunca</em></span>
+                    {% endif %}
+                    <button type="button" id="btn-executar-quarentena" style="padding:6px 16px; background:#dc2626; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:13px;" title="Exclui permanentemente pedidos arquivados que venceram a quarentena">
+                        🗑 Executar Quarentena Agora
+                    </button>
+                    <span id="arq-q-msg" style="font-size:12px;"></span>
+                </div>
+            </div>
+            <script>
+            (function(){
+                const executarQUrl = "{% url 'rotas:executar_quarentena_agora' %}";
+                const csrfQ = document.querySelector('[name=csrfmiddlewaretoken]').value;
+                document.getElementById('btn-executar-quarentena').addEventListener('click', function(){
+                    if(!confirm('Atenção: pedidos arquivados com quarentena vencida serão excluídos PERMANENTEMENTE.\nDeseja continuar?')) return;
+                    const btn = this;
+                    const msg = document.getElementById('arq-q-msg');
+                    btn.disabled = true;
+                    btn.textContent = 'Executando...';
+                    fetch(executarQUrl, {
+                        method: 'POST',
+                        headers: {'Content-Type':'application/json', 'X-CSRFToken': csrfQ},
+                        body: '{}',
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        if(data.success){
+                            msg.textContent = `✓ ${data.excluidos} pedido(s) excluídos.`;
+                            msg.style.color = '#16a34a';
+                            const el = document.getElementById('arq-q-ultima');
+                            if(el) el.innerHTML = `Última: <strong>${data.ultima_execucao}</strong>`;
+                        } else {
+                            msg.textContent = 'Erro ao executar.';
+                            msg.style.color = '#dc2626';
+                        }
+                        setTimeout(() => { msg.textContent = ''; }, 4000);
+                    })
+                    .catch(() => { msg.textContent = 'Erro de conexão.'; msg.style.color = '#dc2626'; })
+                    .finally(() => { btn.disabled = false; btn.textContent = '🗑 Executar Quarentena Agora'; });
+                });
+            })();
+            </script>
+
+            <h2>Outras Configurações</h2>
+            
+            <div class="form-group" style="margin-top: 12px;">
+                <a href="{% url 'rotas:templates_pdf_list' %}" style="color:#2f6ad4; font-weight:600; text-decoration:none; display:block;">📄 Gerenciar Templates de PDF</a>
+            </div>
+            
+            <button type="submit" class="btn btn-submit" style="margin-top: 30px;">Salvar Configurações</button>
+        </form>
+    </div>
+</div>
+
+</body>
+</html>

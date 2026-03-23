@@ -1,0 +1,243 @@
+================================================================================
+   FERMAP LOGISTICA - GUIA COMPLETO DE INSTALACAO E USO
+================================================================================
+
+Este guia explica como levar este projeto para outro computador e configura-lo
+do zero. Siga os passos na ordem.
+
+
+================================================================================
+  PARTE 1 - PRE-REQUISITOS (instalar no computador novo)
+================================================================================
+
+1. PYTHON 3.10 ou superior
+   - Baixe em: https://www.python.org/downloads/
+   - IMPORTANTE: Marque a opcao "Add Python to PATH" durante a instalacao!
+   - Para verificar: abra o terminal e digite: python --version
+
+2. NODE.JS 18 ou superior (opcional, so para o modulo Raio-X)
+   - Baixe em: https://nodejs.org/
+   - Para verificar: abra o terminal e digite: node --version
+
+3. GIT (opcional, se for clonar via repositorio)
+   - Baixe em: https://git-scm.com/downloads
+
+
+================================================================================
+  PARTE 2 - COPIAR O PROJETO
+================================================================================
+
+OPCAO A - Via Git (se tiver repositorio):
+  git clone https://github.com/SEU_USUARIO/logistica_project.git
+  cd logistica_project
+
+OPCAO B - Via pendrive/ZIP:
+  Copie a pasta do projeto para o novo computador.
+  NAO precisa copiar estas pastas (serao recriadas):
+    .venv/          -> ambiente virtual Python (recriado no passo 3)
+    node_modules/   -> pacotes Node.js (recriado no passo 6)
+    __pycache__/    -> cache Python (recriado automaticamente)
+
+  O que DEVE copiar:
+    - Todos os arquivos e pastas do projeto
+    - db.sqlite3 (se quiser manter seus dados, usuarios e configuracoes)
+
+
+================================================================================
+  PARTE 3 - INSTALACAO RAPIDA (automatica)
+================================================================================
+
+Metodo mais simples - basta um duplo-clique:
+
+  1. Abra a pasta do projeto no Explorer
+  2. Duplo-clique em: INSTALAR.bat
+  3. Aguarde a instalacao completar
+  4. Quando perguntar, crie um usuario administrador (anote usuario e senha!)
+  5. Pronto! Para iniciar, duplo-clique em: iniciar.bat
+  6. Abra no navegador: http://localhost:8000
+
+
+================================================================================
+  PARTE 4 - INSTALACAO MANUAL (passo a passo)
+================================================================================
+
+Se preferir fazer manualmente, abra o PowerShell na pasta do projeto:
+
+PASSO 1 - Criar ambiente virtual Python:
+  python -m venv .venv
+
+PASSO 2 - Ativar o ambiente virtual:
+  .venv\Scripts\Activate.ps1
+  (no prompt vai aparecer (.venv) no inicio da linha)
+
+PASSO 3 - Instalar dependencias Python:
+  pip install -r requirements.txt
+
+PASSO 4 - Configurar variaveis de ambiente:
+  Crie (ou edite) o arquivo .env na raiz do projeto com o conteudo:
+
+    DEBUG=True
+    SECRET_KEY=uma-chave-secreta-qualquer-troque-em-producao
+    ALLOWED_HOSTS=localhost,127.0.0.1
+    OSRM_ROUTER_URL=https://router.project-osrm.org/route/v1
+
+  (A chave do Google Maps pode ser configurada dentro do sistema, nao
+   precisa colocar no .env)
+
+PASSO 5 - Aplicar migracoes do banco de dados:
+  python manage.py migrate
+
+PASSO 6 - Coletar arquivos estaticos:
+  python manage.py collectstatic --noinput
+
+PASSO 7 - Criar usuario administrador:
+  python manage.py createsuperuser
+  (siga as instrucoes, anote usuario e senha!)
+
+PASSO 8 - Iniciar o servidor:
+  python manage.py runserver 8000
+
+PASSO 9 - Acessar no navegador:
+  http://localhost:8000
+
+
+================================================================================
+  PARTE 5 - MODULO RAIO-X (opcional)
+================================================================================
+
+O Raio-X eh um painel analitico em React. Se quiser usa-lo:
+
+PASSO 1 - Entrar na pasta do Raio-X:
+  cd raio-x-app
+
+PASSO 2 - Instalar dependencias:
+  npm install
+
+PASSO 3 - Iniciar em modo desenvolvimento:
+  npm run dev
+
+PASSO 4 - Acessar:
+  http://localhost:5173
+
+
+================================================================================
+  PARTE 6 - CONFIGURACAO DO GOOGLE MAPS (busca de endereco)
+================================================================================
+
+Para usar a busca de endereco por Google Maps nas rotas:
+
+1. CRIAR CHAVE DE API:
+   - Acesse: https://console.cloud.google.com/
+   - Crie ou selecione um projeto
+   - Va em: APIs e Servicos > Credenciais
+   - Clique: Criar credencial > Chave de API
+
+2. ATIVAR AS APIs NECESSARIAS (todas as 3):
+   - Va em: APIs e Servicos > Biblioteca
+   - Pesquise e ative cada uma:
+     a) Maps JavaScript API
+     b) Places API  (a versao SEM "New" no nome)
+     c) Geocoding API  (a versao SEM "New" no nome)
+   ATENCAO: Ative a versao LEGACY (sem "New"). A versao "New" nao funciona
+   com este projeto.
+
+3. CONFIGURAR RESTRICOES DA CHAVE (recomendado):
+   - Va nas configuracoes da chave
+   - Em "Restricoes de aplicativo", selecione "Referenciadores HTTP"
+   - Adicione:
+     http://localhost:8000/*
+     http://127.0.0.1:8000/*
+   - Em "Restricoes de API", selecione as 3 APIs acima
+
+4. INSERIR A CHAVE NO SISTEMA:
+   - Acesse o sistema: http://localhost:8000
+   - Faca login
+   - Va em: Configuracoes da Conta (icone de engrenagem)
+   - Na secao "Google Maps e Busca por Endereco"
+   - Cole sua chave de API
+   - Salve
+
+5. ATIVAR FATURAMENTO (obrigatorio pelo Google):
+   - O Google exige que o projeto tenha faturamento ativo
+   - Ha credito gratuito mensal (US$ 200/mes)
+   - Sem faturamento ativo, as APIs retornam erro
+
+
+================================================================================
+  PARTE 7 - CONFIGURACAO DO FIREBIRD (conexao com ERP)
+================================================================================
+
+Se o sistema ERP usa Firebird e voce quer importar pedidos:
+
+1. Instale o Firebird Client no computador
+   (veja o arquivo FIREBIRD_CLIENT_INSTALL.md para detalhes)
+
+2. No sistema, va em: Firebird > Conexao
+3. Configure: Host, Porta, Caminho do banco, Usuario, Senha
+4. Clique "Testar Conexao" para verificar
+5. Crie queries SQL em: Firebird > Nova Query
+
+
+================================================================================
+  PARTE 8 - USO DIARIO
+================================================================================
+
+INICIAR O SISTEMA:
+  Duplo-clique em: iniciar.bat
+  Ou manualmente:
+    cd pasta-do-projeto
+    .venv\Scripts\Activate.ps1
+    python manage.py runserver 8000
+
+ACESSAR:
+  Sistema:  http://localhost:8000
+  Admin:    http://localhost:8000/admin/
+
+PARAR O SISTEMA:
+  Pressione Ctrl+C no terminal
+
+
+================================================================================
+  PARTE 9 - SOLUCAO DE PROBLEMAS
+================================================================================
+
+ERRO: "Python nao encontrado"
+  -> Reinstale o Python marcando "Add to PATH"
+  -> Ou use o caminho completo: C:\Python312\python.exe
+
+ERRO: "pip nao reconhecido"
+  -> Use: python -m pip install -r requirements.txt
+
+ERRO: Pagina nao abre / erro 500
+  -> Verifique se o servidor esta rodando no terminal
+  -> Verifique se o .env existe e tem SECRET_KEY
+
+ERRO: Google Maps nao funciona / busca de endereco nao carrega
+  -> Verifique se a chave de API esta salva em Configuracoes da Conta
+  -> Verifique se as 3 APIs estao ativas no Google Cloud Console
+  -> Verifique se o faturamento esta ativo no projeto Google Cloud
+  -> Use as versoes LEGACY das APIs (sem "New" no nome)
+
+ERRO: "ModuleNotFoundError"
+  -> Ative o ambiente virtual: .venv\Scripts\Activate.ps1
+  -> Reinstale: pip install -r requirements.txt
+
+ERRO: Porta 8000 ja em uso
+  -> Use outra porta: python manage.py runserver 8080
+  -> Ou feche o outro processo na porta 8000
+
+
+================================================================================
+  RESUMO RAPIDO
+================================================================================
+
+  1. Instalar Python 3.10+
+  2. Copiar pasta do projeto
+  3. Duplo-clique em INSTALAR.bat
+  4. Criar usuario admin
+  5. Duplo-clique em iniciar.bat
+  6. Abrir http://localhost:8000
+  7. Configurar Google Maps em Configuracoes da Conta (opcional)
+  8. Configurar Firebird em Firebird > Conexao (opcional)
+
+================================================================================

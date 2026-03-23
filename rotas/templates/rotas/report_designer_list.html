@@ -1,0 +1,197 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editor de Relatórios - Fermap Logística</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; }
+        
+        nav { background: #1a73e8; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        nav strong { font-size: 20px; }
+        nav a { color: white; text-decoration: none; margin: 0 15px; transition: opacity 0.2s; }
+        nav a:hover { opacity: 0.8; }
+        
+        .container { max-width: 1400px; margin: 30px auto; padding: 0 20px; }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .header h1 { color: #202124; font-size: 28px; }
+        
+        .btn-novo { background: #1a73e8; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; transition: background 0.2s; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+        .btn-novo:hover { background: #1557b0; }
+        
+        .layouts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; }
+        
+        .layout-card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); transition: box-shadow 0.2s, transform 0.2s; position: relative; }
+        .layout-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.15); transform: translateY(-2px); }
+        
+        .layout-card h3 { color: #202124; margin-bottom: 8px; font-size: 18px; }
+        .layout-card .description { color: #5f6368; font-size: 14px; margin-bottom: 16px; min-height: 40px; }
+        
+        .layout-info { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+        .layout-info-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #5f6368; }
+        .layout-info-item strong { color: #202124; min-width: 80px; }
+        
+        .layout-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+        .badge-padrao { background: #e8f5e9; color: #2e7d32; }
+        .badge-ativo { background: #e3f2fd; color: #1565c0; }
+        
+        .layout-actions { display: flex; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid #e8eaed; }
+        
+        .btn { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; font-weight: 500; text-decoration: none; display: inline-block; transition: all 0.2s; }
+        .btn-primary { background: #1a73e8; color: white; }
+        .btn-primary:hover { background: #1557b0; }
+        .btn-secondary { background: #f1f3f4; color: #5f6368; }
+        .btn-secondary:hover { background: #e8eaed; }
+        .btn-danger { background: #ea4335; color: white; }
+        .btn-danger:hover { background: #d33426; }
+        .btn-success { background: #34a853; color: white; }
+        .btn-success:hover { background: #2d9348; }
+        
+        .empty { text-align: center; padding: 60px 20px; }
+        .empty-icon { font-size: 64px; margin-bottom: 16px; opacity: 0.3; }
+        .empty h2 { color: #5f6368; font-size: 24px; margin-bottom: 12px; font-weight: 400; }
+        .empty p { color: #80868b; margin-bottom: 24px; }
+        
+        .stats-bar { background: white; border-radius: 12px; padding: 20px 24px; margin-bottom: 24px; display: flex; gap: 32px; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+        .stat-item { display: flex; align-items: center; gap: 12px; }
+        .stat-icon { font-size: 32px; opacity: 0.8; }
+        .stat-content strong { display: block; font-size: 24px; color: #202124; }
+        .stat-content span { font-size: 13px; color: #5f6368; }
+        
+        .messages { max-width: 1400px; margin: 20px auto; padding: 0 20px; }
+        .alert { padding: 14px 20px; border-radius: 8px; margin-bottom: 12px; display: flex; align-items: center; gap: 12px; font-size: 14px; }
+        .alert-success { background: #e8f5e9; color: #2e7d32; border-left: 4px solid #2e7d32; }
+        .alert-error { background: #fce4ec; color: #c62828; border-left: 4px solid #c62828; }
+        .alert-info { background: #e3f2fd; color: #1565c0; border-left: 4px solid #1565c0; }
+    </style>
+</head>
+<body>
+
+<nav>
+    <strong>📊 Editor de Relatórios - Fermap Logística</strong>
+    <div>
+        <a href="{% url 'rotas:index' %}">🏠 Início</a>
+        <a href="{% url 'rotas:lista_rotas' %}">🗺️ Rotas</a>
+        <a href="{% url 'rotas:configuracao_usuario' %}">⚙️ Configurações</a>
+        <a href="/admin/logout/">🚪 Sair</a>
+    </div>
+</nav>
+
+{% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {% if message.tags == 'success' %}✓{% elif message.tags == 'error' %}✗{% else %}ℹ{% endif %}
+                {{ message }}
+            </div>
+        {% endfor %}
+    </div>
+{% endif %}
+
+<div class="container">
+    <div class="header">
+        <h1>📊 Meus Layouts de Relatório</h1>
+        <a href="{% url 'rotas:report_designer_new' %}" class="btn-novo">
+            ➕ Novo Layout
+        </a>
+    </div>
+    
+    {% if layouts %}
+        <div class="stats-bar">
+            <div class="stat-item">
+                <div class="stat-icon">📄</div>
+                <div class="stat-content">
+                    <strong>{{ total_layouts }}</strong>
+                    <span>Layout{{ total_layouts|pluralize }}</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="layouts-grid">
+            {% for layout in layouts %}
+                <div class="layout-card">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+                        <h3>{{ layout.nome }}</h3>
+                        <div style="display: flex; gap: 6px;">
+                            {% if layout.padrao %}
+                                <span class="layout-badge badge-padrao">Padrão</span>
+                            {% endif %}
+                            {% if layout.ativo %}
+                                <span class="layout-badge badge-ativo">Ativo</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="description">
+                        {{ layout.descricao|default:"Sem descrição"|truncatewords:15 }}
+                    </div>
+                    
+                    <div class="layout-info">
+                        <div class="layout-info-item">
+                            <strong>📏 Página:</strong>
+                            <span>{{ layout.get_page_size_display }} - {{ layout.get_orientation_display }}</span>
+                        </div>
+                        <div class="layout-info-item">
+                            <strong>🔗 Query:</strong>
+                            <span>{{ layout.query.nome_query|default:"Nenhuma" }}</span>
+                        </div>
+                        <div class="layout-info-item">
+                            <strong>📅 Modificado:</strong>
+                            <span>{{ layout.data_modificacao|date:"d/m/Y H:i" }}</span>
+                        </div>
+                        <div class="layout-info-item">
+                            <strong>🔢 Versão:</strong>
+                            <span>{{ layout.versao }}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="layout-actions">
+                        <a href="{% url 'rotas:report_designer_editor' layout.id %}" class="btn btn-primary">
+                            ✏️ Editar
+                        </a>
+                        <a href="{% url 'rotas:report_designer_duplicate' layout.id %}" class="btn btn-secondary">
+                            📋 Duplicar
+                        </a>
+                        <a href="{% url 'rotas:report_designer_export' layout.id %}" class="btn btn-success">
+                            💾 Exportar
+                        </a>
+                        <form method="post" action="{% url 'rotas:report_designer_delete' layout.id %}" style="display: inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger" onclick="return confirm('Tem certeza que deseja deletar este layout?')">
+                                🗑️ Deletar
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty">
+            <div class="empty-icon">📊</div>
+            <h2>Nenhum layout criado</h2>
+            <p>Crie seu primeiro layout de relatório personalizado</p>
+            <a href="{% url 'rotas:report_designer_new' %}" class="btn-novo">
+                ➕ Criar Primeiro Layout
+            </a>
+        </div>
+    {% endif %}
+    
+    {% if layouts %}
+        <div style="margin-top: 32px; padding: 24px; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.12);">
+            <h3 style="margin-bottom: 16px; color: #202124;">📥 Importar Layout</h3>
+            <form method="post" action="{% url 'rotas:report_designer_import' %}" enctype="multipart/form-data" style="display: flex; gap: 12px; align-items: center;">
+                {% csrf_token %}
+                <input type="file" name="file" accept=".json" required style="flex: 1; padding: 8px; border: 1px solid #dadce0; border-radius: 6px;">
+                <button type="submit" class="btn btn-primary">
+                    📤 Importar JSON
+                </button>
+            </form>
+        </div>
+    {% endif %}
+</div>
+
+</body>
+</html>

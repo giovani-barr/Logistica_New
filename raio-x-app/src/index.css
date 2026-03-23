@@ -1,0 +1,17 @@
+@import "tailwindcss" important;
+
+/* React Grid Layout */
+.react-grid-layout { position: relative; transition: height 200ms ease; }
+.react-grid-item { transition: all 200ms ease; transition-property: left, top, width, height; }
+.react-grid-item.cssTransforms { transition-property: transform, width, height; }
+.react-grid-item.resizing { z-index: 1; will-change: width, height; }
+.react-grid-item.react-draggable-dragging { transition: none; z-index: 3; will-change: transform; }
+.react-grid-placeholder { background: #3b82f6; opacity: 0.15; border-radius: 8px; transition-duration: 100ms; z-index: 2; }
+.react-grid-item > .react-resizable-handle { position: absolute; width: 20px; height: 20px; bottom: 0; right: 0; cursor: se-resize; }
+.react-grid-item > .react-resizable-handle::after { content: ""; position: absolute; right: 3px; bottom: 3px; width: 6px; height: 6px; border-right: 2px solid rgba(0,0,0,.25); border-bottom: 2px solid rgba(0,0,0,.25); }
+
+/* Scrollbar — só dentro do Raio X */
+#raio-x-root ::-webkit-scrollbar { width: 6px; height: 6px; }
+#raio-x-root ::-webkit-scrollbar-track { background: transparent; }
+#raio-x-root ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
+#raio-x-root ::-webkit-scrollbar-thumb:hover { background: #64748b; }

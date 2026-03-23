@@ -1,0 +1,130 @@
+================================================================================
+  FERMAP LOGÍSTICA - GUIA RÁPIDO DE INICIALIZAÇÃO
+================================================================================
+
+📌 PRIMEIRA VEZ USANDO O SISTEMA?
+================================================================================
+
+1. Duplo-clique em: setup_completo.bat
+   
+   Este arquivo irá:
+   ✓ Configurar o ambiente virtual Python
+   ✓ Instalar todas as dependências necessárias
+   ✓ Criar o banco de dados
+   ✓ Solicitar criação de usuário administrador
+   
+   ⚠️ IMPORTANTE: Anote o usuário e senha que você criar!
+
+
+2. Após a configuração, para iniciar o sistema:
+   
+   Duplo-clique em: iniciar.bat
+   
+   O sistema abrirá em: http://localhost:8000
+
+
+================================================================================
+📌 JÁ CONFIGUROU? USE SEMPRE O ARQUIVO INICIAR.BAT
+================================================================================
+
+Para usar o sistema depois de configurado:
+
+1. Duplo-clique em: iniciar.bat
+
+2. Aguarde o servidor iniciar (aparecerá uma mensagem de confirmação)
+
+3. Abra o navegador em: http://localhost:8000
+
+4. Faça login com seu usuário e senha
+
+5. Para parar o servidor: Pressione Ctrl+C no terminal
+
+
+================================================================================
+📌 INTEGRAÇÃO COM FIREBIRD
+================================================================================
+
+Se você precisa importar pedidos do sistema Firebird:
+
+1. Após fazer login, vá em "Conexão Firebird"
+
+2. Configure os dados de conexão:
+   - Host: endereço do servidor Firebird
+   - Porta: geralmente 3050
+   - Caminho do Banco: caminho completo do arquivo .FDB ou .ECO
+   - Usuário: geralmente SYSDBA
+   - Senha: senha do banco Firebird
+
+3. Teste a conexão
+
+4. Crie queries SQL para buscar os pedidos
+
+5. Mapeie os campos da query (pedido, cliente, latitude, longitude, etc)
+
+6. Importe os pedidos e transforme em rotas de entrega
+
+
+================================================================================
+📌 PROBLEMAS COMUNS
+================================================================================
+
+❌ Erro "Python não encontrado"
+   → Certifique-se que o Python 3.8+ está instalado
+   → Verifique se o ambiente virtual (pasta venv) existe
+
+❌ Erro "Porta 8000 já está em uso"
+   → Feche outros servidores rodando na porta 8000
+   → Ou reinicie o computador
+
+❌ Erro ao conectar no Firebird
+   → Verifique se o arquivo fbclient.dll está na pasta firebird_client
+   → Confirme que o caminho do banco está correto
+   → Use DLL 64-bit se seu Python for 64-bit
+
+❌ Esqueci a senha do admin
+   → Execute: python manage.py changepassword seu_usuario
+   → (Ative o ambiente virtual primeiro: venv\Scripts\activate)
+
+
+================================================================================
+📌 INFORMAÇÕES TÉCNICAS
+================================================================================
+
+🔧 Tecnologias:
+   - Django 4.2.8
+   - Python 3.8+
+   - SQLite (banco local)
+   - Bootstrap 5
+   - Leaflet Maps
+   - Firebird 2.5 client (opcional)
+
+📁 Estrutura de Pastas:
+   - rotas/        → Aplicação principal
+   - api/          → API REST
+   - db.sqlite3    → Banco de dados local
+   - venv/         → Ambiente virtual Python
+   - firebird_client/ → DLL Firebird
+
+📝 Arquivos de log:
+   - Verifique o terminal onde o servidor está rodando
+   - Erros aparecem em vermelho no terminal
+
+
+================================================================================
+📌 SUPORTE E DOCUMENTAÇÃO
+================================================================================
+
+📖 Documentação completa: README.md
+📖 Integração Firebird: FIREBIRD_INTEGRATION.md
+📖 Início rápido: QUICKSTART.md
+📖 Estrutura do projeto: PROJECT_STRUCTURE.md
+
+🆘 Em caso de dúvidas:
+   - Verifique os arquivos .md na raiz do projeto
+   - Revise as mensagens de erro no terminal
+   - Confirme que seguiu todos os passos
+
+
+================================================================================
+  Boa sorte! 🚀
+================================================================================

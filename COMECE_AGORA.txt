@@ -1,0 +1,40 @@
+# COMECAR AGORA - GUIA RAPIDO
+
+Se voce tem pouca experiencia, siga exatamente nesta ordem.
+
+PASSO 1 - Instalar programas obrigatorios
+1. Python: https://www.python.org/downloads/
+2. Node.js LTS: https://nodejs.org/
+3. Git: https://git-scm.com/downloads
+
+PASSO 2 - Primeira configuracao do projeto
+1. Duplo-clique em INSTALAR.bat
+2. Leia cada tela e aperte uma tecla para continuar
+3. Se aparecer ERRO, pare e leia a etapa indicada
+
+PASSO 3 - Iniciar o sistema
+1. Duplo-clique em iniciar.bat
+2. Deixe a janela aberta
+3. Acesse no navegador: http://localhost:8000
+
+PASSO 4 - Login no sistema
+1. URL admin: http://localhost:8000/admin/
+2. Use o usuario criado durante a instalacao
+
+SE A TELA NAO ABRIR
+1. Confirme se a janela do iniciar.bat continua aberta
+2. Verifique se apareceu alguma linha com ERRO
+3. Rode INSTALAR.bat novamente
+
+SE DER ERRO DE NODE/NPM NO POWERSHELL
+1. Use npm.cmd install
+2. Use npm.cmd run build
+
+ARQUIVOS IMPORTANTES
+1. INSTALAR.bat: configuracao inicial guiada
+2. setup_completo.bat: configuracao alternativa
+3. iniciar.bat: iniciar servidor
+4. PROGRAMAS_E_EXTENSOES_NECESSARIOS.md: lista completa de instalacoes
+
+FIM
+

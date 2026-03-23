@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Montar Rota por Pedidos</title>
+	<style>
+		body { font-family: 'Segoe UI', Tahoma, sans-serif; background:#f5f7fb; margin:0; }
+		.wrap { max-width: 1100px; margin: 22px auto; padding: 0 16px; }
+		.card { background:#fff; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,.08); padding:18px; }
+		.top { display:flex; gap:10px; align-items:center; justify-content:space-between; margin-bottom:14px; }
+		.filters { display:flex; gap:10px; align-items:center; margin-bottom:12px; }
+		.filters input { flex:1; padding:10px; border:1px solid #d7dce2; border-radius:8px; }
+		.btn { border:none; border-radius:8px; padding:10px 12px; font-weight:600; cursor:pointer; }
+		.btn-primary { background:#2563eb; color:#fff; }
+		.btn-light { background:#e9edf5; color:#1f2937; text-decoration:none; }
+		.grid { display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:12px; }
+		.grid label { display:block; font-size:12px; font-weight:700; color:#4b5563; margin-bottom:5px; }
+		.grid select, .grid input { width:100%; padding:10px; border:1px solid #d7dce2; border-radius:8px; }
+		.list { max-height: 60vh; overflow:auto; border:1px solid #e5e7eb; border-radius:8px; background:#fff; }
+		.row { display:flex; align-items:flex-start; gap:10px; padding:10px; border-bottom:1px solid #f0f2f5; }
+		.row:last-child { border-bottom:none; }
+		.row .meta { font-size:12px; color:#64748b; }
+		.row .title { font-weight:700; color:#0f172a; }
+		.warn { color:#c2410c; font-size:12px; }
+	</style>
+</head>
+<body>
+<div class="wrap">
+	<div class="card">
+		<div class="top">
+			<h2 style="margin:0;">🗺️ Montar Rota por Seleção de Pedidos</h2>
+			<a class="btn btn-light" href="{% url 'rotas:index' %}">Voltar</a>
+		</div>
+
+		<form method="post" action="{% url 'rotas:criar_rota_de_pedidos' %}">
+			{% csrf_token %}
+
+			<div class="grid">
+				<div>
+					<label for="rota_id">Adicionar em rota existente (opcional)</label>
+					<select id="rota_id" name="rota_id">
+						<option value="">-- Criar nova rota --</option>
+						{% for rota in rotas %}
+							<option value="{{ rota.id }}">{{ rota.nome }}</option>
+						{% endfor %}
+					</select>
+				</div>
+				<div>
+					<label for="rota_nome">Nome da nova rota</label>
+					<input type="text" id="rota_nome" name="rota_nome" placeholder="Ex: Rota Região Central">
+				</div>
+			</div>
+
+			<div class="filters">
+				<input type="text" id="buscaPedidos" placeholder="Buscar por pedido, cliente, endereço...">
+				<button type="button" class="btn btn-light" id="btnTodos">Marcar todos</button>
+				<button type="button" class="btn btn-light" id="btnNenhum">Desmarcar</button>
+				<button type="submit" class="btn btn-primary">Montar Rota com Selecionados</button>
+			</div>
+
+			<div class="list" id="listaPedidos">
+				{% for pedido in pedidos %}
+				<label class="row" data-search="{{ pedido.numero_pedido }} {{ pedido.cliente_nome }} {{ pedido.endereco|default:'' }}">
+					<input type="checkbox" name="pedido_ids" value="{{ pedido.id }}">
+					<div>
+						<div class="title">#{{ pedido.numero_pedido }} — {{ pedido.cliente_nome }}</div>
+						<div class="meta">{{ pedido.endereco|default:'Sem endereço' }}</div>
+						{% if not pedido.latitude or not pedido.longitude %}
+							<div class="warn">⚠ Sem coordenadas</div>
+						{% endif %}
+					</div>
+				</label>
+				{% empty %}
+				<div style="padding:16px; color:#64748b;">Não há pedidos pendentes para montar rota.</div>
+				{% endfor %}
+			</div>
+		</form>
+	</div>
+</div>
+
+<script>
+const busca = document.getElementById('buscaPedidos');
+const lista = document.getElementById('listaPedidos');
+const btnTodos = document.getElementById('btnTodos');
+const btnNenhum = document.getElementById('btnNenhum');
+
+if (busca && lista) {
+	busca.addEventListener('input', function () {
+		const q = (this.value || '').toLowerCase().trim();
+		lista.querySelectorAll('.row').forEach(row => {
+			const txt = (row.dataset.search || '').toLowerCase();
+			row.style.display = (!q || txt.includes(q)) ? 'flex' : 'none';
+		});
+	});
+}
+
+if (btnTodos && lista) {
+	btnTodos.addEventListener('click', function () {
+		lista.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+			if (cb.closest('.row')?.style.display !== 'none') cb.checked = true;
+		});
+	});
+}
+
+if (btnNenhum && lista) {
+	btnNenhum.addEventListener('click', function () {
+		lista.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+	});
+}
+</script>
+</body>
+</html>
