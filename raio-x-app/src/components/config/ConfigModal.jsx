@@ -60,20 +60,20 @@ const COMPONENT_LABELS = {
 }
 
 const LAYOUT_WIDTH_OPTIONS = [
-  { value: 12.5, label: '1/8 (12,5%)' },
+  { value: 12.5, label: '12,5%' },
   { value: 20, label: '20%' },
-  { value: 25, label: '2/8 (25%)' },
+  { value: 25, label: '25%' },
   { value: 30, label: '30%' },
-  { value: 37.5, label: '3/8 (37,5%)' },
+  { value: 37.5, label: '37,5%' },
   { value: 40, label: '40%' },
-  { value: 50, label: '4/8 (50%)' },
+  { value: 50, label: '50%' },
   { value: 60, label: '60%' },
-  { value: 62.5, label: '5/8 (62,5%)' },
+  { value: 62.5, label: '62,5%' },
   { value: 66.67, label: '66,67%' },
-  { value: 75, label: '6/8 (75%)' },
+  { value: 75, label: '75%' },
   { value: 80, label: '80%' },
-  { value: 87.5, label: '7/8 (87,5%)' },
-  { value: 100, label: '8/8 (100%)' },
+  { value: 87.5, label: '87,5%' },
+  { value: 100, label: '100%' },
 ]
 
 const HEIGHT_DELTA_OPTIONS = [-50, -40, -30, -20, -10, 0, 10, 20, 30, 40, 50]
@@ -1956,33 +1956,45 @@ export default function ConfigModal() {
                                       })
                                     }
                                   }}
-                                  className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs ${dark ? 'bg-slate-800 text-slate-300' : 'bg-white text-slate-700 border border-slate-200'}`}
+                                  className={`rounded-lg px-2 py-2 text-xs ${dark ? 'bg-slate-800 text-slate-300' : 'bg-white text-slate-700 border border-slate-200'}`}
                                 >
-                                  <GripVertical size={11} className="opacity-40" />
-                                  <span className="flex-1">{getCompLabel(component, aba.widget_configs, aba.sqls_extras, aba.componentes_ordem)}</span>
-                                  <select
-                                    value={String(layout.widthPct)}
-                                    onChange={(event) => setComponentLayout(component, { widthPct: Number(event.target.value) })}
-                                    className={`rounded-md border px-2 py-1 text-[11px] ${dark ? 'bg-slate-900 border-slate-600 text-slate-200' : 'bg-white border-slate-300 text-slate-700'}`}
-                                    title={`Largura: ${LAYOUT_WIDTH_LABEL[String(layout.widthPct)] || layout.widthPct}`}
-                                  >
-                                    {LAYOUT_WIDTH_OPTIONS.map((opt) => (
-                                      <option key={String(opt.value)} value={String(opt.value)}>{opt.label}</option>
-                                    ))}
-                                  </select>
-                                  <select
-                                    value={String(layout.heightDeltaPct)}
-                                    onChange={(event) => setComponentLayout(component, { heightDeltaPct: Number(event.target.value) })}
-                                    className={`rounded-md border px-2 py-1 text-[11px] ${dark ? 'bg-slate-900 border-slate-600 text-slate-200' : 'bg-white border-slate-300 text-slate-700'}`}
-                                    title="Ajuste de altura"
-                                  >
-                                    {HEIGHT_DELTA_OPTIONS.map((pct) => (
-                                      <option key={String(pct)} value={String(pct)}>
-                                        {pct > 0 ? `+${pct}%` : `${pct}%`}
-                                      </option>
-                                    ))}
-                                  </select>
-                                  <button onClick={() => removeComponent(component)} className={cls.btnDanger}><Trash2 size={12} /></button>
+                                  <div className="flex items-start gap-2">
+                                    <GripVertical size={11} className="opacity-40 mt-0.5" />
+                                    <span className="flex-1 font-medium leading-tight">{getCompLabel(component, aba.widget_configs, aba.sqls_extras, aba.componentes_ordem)}</span>
+                                    <button onClick={() => removeComponent(component)} className={cls.btnDanger}><Trash2 size={12} /></button>
+                                  </div>
+
+                                  <div className="mt-2 grid grid-cols-2 gap-2">
+                                    <div>
+                                      <div className={`${cls.helper} mb-1`}>Largura</div>
+                                      <select
+                                        value={String(layout.widthPct)}
+                                        onChange={(event) => setComponentLayout(component, { widthPct: Number(event.target.value) })}
+                                        className={`w-full rounded-md border px-2 py-1 text-[11px] ${dark ? 'bg-slate-900 border-slate-600 text-slate-200' : 'bg-white border-slate-300 text-slate-700'}`}
+                                        title={`Largura: ${LAYOUT_WIDTH_LABEL[String(layout.widthPct)] || layout.widthPct}`}
+                                      >
+                                        {LAYOUT_WIDTH_OPTIONS.map((opt) => (
+                                          <option key={String(opt.value)} value={String(opt.value)}>{opt.label}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+
+                                    <div>
+                                      <div className={`${cls.helper} mb-1`}>Altura</div>
+                                      <select
+                                        value={String(layout.heightDeltaPct)}
+                                        onChange={(event) => setComponentLayout(component, { heightDeltaPct: Number(event.target.value) })}
+                                        className={`w-full rounded-md border px-2 py-1 text-[11px] ${dark ? 'bg-slate-900 border-slate-600 text-slate-200' : 'bg-white border-slate-300 text-slate-700'}`}
+                                        title="Ajuste de altura"
+                                      >
+                                        {HEIGHT_DELTA_OPTIONS.map((pct) => (
+                                          <option key={String(pct)} value={String(pct)}>
+                                            {pct > 0 ? `+${pct}%` : `${pct}%`}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  </div>
                                 </div>
                                   )
                                 })()
