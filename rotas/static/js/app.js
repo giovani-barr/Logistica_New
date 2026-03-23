@@ -913,6 +913,14 @@ let rotasCardConfig = window.rotasCardConfig || {
 // Campos configurados para exibição nos cards de rota (definidos no template)
 let rotasCamposExibicao = window.rotasCamposExibicao || [];
 
+window.addEventListener('rotas-campos-atualizados', function (event) {
+    const novosCampos = event && event.detail ? event.detail.campos : null;
+    if (!Array.isArray(novosCampos)) return;
+    rotasCamposExibicao = novosCampos;
+    window.rotasCamposExibicao = novosCampos;
+    renderStops();
+});
+
 // Configurações visuais dos cards de rota
 let rotasVisualConfig = window.rotasVisualConfigData || {};
 
@@ -1497,35 +1505,40 @@ function _diffHoursFromNow(str) {
     return (Date.now() - d.getTime()) / 3600000;
 }
 
-function _regraCorCombina(regra, stop) {
-    if (!regra || !regra.campo || !stop.pedidoData) return false;
-    
+function _avaliarCondicaoUnicaRota(cond, stop) {
     const pedido = stop.pedidoData;
     const dados = pedido.dados_json || {};
-    let valorCampo = pedido[regra.campo] !== undefined ? pedido[regra.campo] : dados[regra.campo];
-    
-    if (valorCampo === null || valorCampo === undefined) return false;
-    
+    let valorCampo = pedido[cond.campo] !== undefined ? pedido[cond.campo] : dados[cond.campo];
+
+    // Converte null/undefined para string vazia para que 'vazio'/'nao_vazio' funcionem corretamente
+    if (valorCampo === null || valorCampo === undefined) valorCampo = '';
+
     const valorStr = String(valorCampo).toLowerCase().trim();
-    const valorRegra = String(regra.valor || '').toLowerCase().trim();
-    
-    switch (regra.operador) {
+    const valorRegra = String(cond.valor || '').toLowerCase().trim();
+    const nCampo = parseFloat(valorStr);
+    const nRegra = parseFloat(valorRegra);
+
+    switch (cond.operador) {
         case 'igual':
             return valorStr === valorRegra;
         case 'diferente':
             return valorStr !== valorRegra;
         case 'contem':
-            return valorStr.includes(valorRegra);
+            return !!valorRegra && valorStr.includes(valorRegra);
         case 'nao_contem':
-            return !valorStr.includes(valorRegra);
+            return !!valorRegra && !valorStr.includes(valorRegra);
         case 'comeca_com':
             return valorStr.startsWith(valorRegra);
         case 'termina_com':
             return valorStr.endsWith(valorRegra);
         case 'maior':
-            return parseFloat(valorStr) > parseFloat(valorRegra);
+            return !isNaN(nCampo) && !isNaN(nRegra) && nCampo > nRegra;
+        case 'maior_igual':
+            return !isNaN(nCampo) && !isNaN(nRegra) && nCampo >= nRegra;
         case 'menor':
-            return parseFloat(valorStr) < parseFloat(valorRegra);
+            return !isNaN(nCampo) && !isNaN(nRegra) && nCampo < nRegra;
+        case 'menor_igual':
+            return !isNaN(nCampo) && !isNaN(nRegra) && nCampo <= nRegra;
         case 'vazio':
             return valorStr === '';
         case 'nao_vazio':
@@ -1562,7 +1575,7 @@ function _regraCorCombina(regra, stop) {
         case 'dias_entre': {
             const dd = _diffDaysFromToday(String(valorCampo));
             const min = Math.round(parseFloat(valorRegra));
-            const max = Math.round(parseFloat(String(regra.valor2 || '')));
+            const max = Math.round(parseFloat(String(cond.valor2 || '')));
             return dd !== null && !isNaN(min) && !isNaN(max) && dd >= min && dd <= max;
         }
         default:
@@ -1570,17 +1583,42 @@ function _regraCorCombina(regra, stop) {
     }
 }
 
+function _regraCorCombina(regra, stop) {
+    if (!regra || !stop.pedidoData) return false;
+
+    // Novo formato: array de condições com lógica AND/OR
+    const condicoes = Array.isArray(regra.condicoes) ? regra.condicoes.filter(c => c.campo) : [];
+    if (condicoes.length > 0) {
+        if (regra.logica === 'OR') {
+            return condicoes.some(c => _avaliarCondicaoUnicaRota(c, stop));
+        }
+        return condicoes.every(c => _avaliarCondicaoUnicaRota(c, stop));
+    }
+
+    // Compatibilidade com formato antigo (campo/operador/valor no topo)
+    if (regra.campo) {
+        return _avaliarCondicaoUnicaRota(regra, stop);
+    }
+
+    return false;
+}
+
 function _getRegraCorAplicada(stop) {
     if (!rotasRegrasCor || !Array.isArray(rotasRegrasCor)) return null;
-    
+
     const ativasOrdenadas = rotasRegrasCor
-        .filter(rule => rule.ativo && rule.campo)
+        .filter(rule => rule.ativo && (Array.isArray(rule.condicoes) ? rule.condicoes.some(c => c.campo) : rule.campo))
         .sort((a, b) => (a.prioridade || 9999) - (b.prioridade || 9999));
-    
+
     return ativasOrdenadas.find(rule => _regraCorCombina(rule, stop)) || null;
 }
 
 function _renderStopFields(stop) {
+    // Sincroniza com o estado global atualizado pelo modal de configuração
+    if (Array.isArray(window.rotasCamposExibicao)) {
+        rotasCamposExibicao = window.rotasCamposExibicao;
+    }
+
     if (!rotasCamposExibicao || !rotasCamposExibicao.length) {
         // Fallback: exibir nome, endereço, obs como antes
         return `
@@ -1631,6 +1669,8 @@ function renderStops() {
     list.innerHTML = orderedStops.map((s) => {
         const isFixed = !!s._fixedType;
         const regraCor = isFixed ? null : _getRegraCorAplicada(s);
+        const regraNome = regraCor && regraCor.nome ? String(regraCor.nome).trim() : '';
+        const regraTitleAttr = regraNome ? ` title="Regra aplicada: ${_escapeHtml(regraNome)}"` : '';
 
         // Ponto de partida fixo = 0; ponto final fixo = não exibe número;
         // paradas normais contam a partir de 1, descontando o ponto de partida fixo
@@ -1671,7 +1711,7 @@ function renderStops() {
                <button class="stop-action-btn delete-btn" onclick="removeStop(${s.id})" title="Remover">✕</button>`;
         
         return `
-        <div class="stop-item" data-id="${s.id}" ${draggable} style="${cardStyle}">
+        <div class="stop-item" data-id="${s.id}" ${draggable} style="${cardStyle}"${regraTitleAttr}>
             <div class="stop-main">
                 ${rotasCardConfig.mostrar_numero && displayIndex !== null ? `<div class="stop-number" style="${regraCor && regraCor.cor_texto ? `color:${regraCor.cor_texto};` : ''}">${displayIndex}</div>` : ''}
                 <div class="stop-info">

@@ -19,6 +19,7 @@
             --pedidos-card-font: {{ config.pedidos_card_tamanho_fonte|default:12 }}px;
             --pedidos-card-pad-y: {{ config.pedidos_card_padding_vertical|default:8 }}px;
             --pedidos-card-pad-x: {{ config.pedidos_card_padding_horizontal|default:8 }}px;
+            --pedidos-card-raio: {{ config.pedidos_card_raio|default:8 }}px;
             
             /* Variáveis para cards de rota */
             --rotas-card-bg: {{ config.rotas_card_cor_fundo|default:'#ffffff' }};
@@ -240,9 +241,17 @@
             padding: 8px 10px;
             border-bottom: 1px solid #e5e7eb;
             background: #fff;
+            position: sticky;
+            top: 0;
+            z-index: 2;
         }
         .card-color-rules-head strong { font-size: 12px; color: #0f172a; }
         .card-color-rules-head small { color: #64748b; font-size: 11px; }
+        .card-color-rules-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
         .btn-add-regra-cor {
             border: 1px solid #0f766e;
             background: #14b8a6;
@@ -252,6 +261,38 @@
             font-size: 11px;
             font-weight: 700;
             cursor: pointer;
+            display: none;
+        }
+        .btn-back-rules {
+            border: 1px solid #cbd5e1;
+            background: #fff;
+            color: #334155;
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            display: none;
+        }
+        .btn-open-rules-inline {
+            border: 1px solid #cbd5e1;
+            background: #fff;
+            color: #334155;
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+        }
+        .btn-open-rules-inline:hover {
+            border-color: #94a3b8;
+            background: #f8fafc;
+        }
+        .btn-back-rules:hover {
+            border-color: #94a3b8;
+            background: #f8fafc;
         }
         .card-color-rules-list {
             display: flex;
@@ -260,6 +301,33 @@
             max-height: 220px;
             overflow: auto;
             padding: 8px;
+        }
+        .card-color-rules-footer {
+            display: none;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+            padding: 8px 10px;
+            border-top: 1px solid #e5e7eb;
+            background: #fff;
+            position: sticky;
+            bottom: 0;
+            z-index: 2;
+        }
+        .btn-rules-footer {
+            border-radius: 6px;
+            padding: 4px 9px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            border: 1px solid #cbd5e1;
+            background: #fff;
+            color: #334155;
+        }
+        .btn-rules-footer.add {
+            border-color: #0f766e;
+            background: #14b8a6;
+            color: #fff;
         }
         .card-color-rule-item {
             border: 1px solid #dbe3ef;
@@ -275,6 +343,16 @@
             gap: 8px;
             font-size: 12px;
             color: #0f172a;
+        }
+        .card-color-rule-head .rule-name-input {
+            min-width: 180px;
+            max-width: 380px;
+            flex: 1;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 12px;
+            background: #fff;
         }
         .card-color-rule-head b {
             min-width: 32px;
@@ -304,24 +382,75 @@
             color: #b91c1c;
         }
         .card-color-rule-labels {
-            display: grid;
-            grid-template-columns: 1.1fr .9fr 1fr 50px .7fr .7fr .7fr;
-            gap: 6px;
-            margin-bottom: 4px;
+            display: none; /* substituído por rule-conditions-labels */
         }
-        .card-color-rule-labels span {
+        .card-color-rule-grid {
+            display: none; /* substituído por rule-conditions-container */
+        }
+        /* ── Layout de cores + lógica ──────────────────────────────── */
+        .rule-colors-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 0 4px;
+            border-top: 1px solid #f0f4f8;
+            flex-wrap: wrap;
+        }
+        .rule-logic-label, .rule-colors-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        .rule-logic-select {
+            border: 1px solid #bfdbfe;
+            border-radius: 6px;
+            padding: 4px 6px;
+            font-size: 12px;
+            background: #eff6ff;
+            color: #1d4ed8;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .rule-esp-input {
+            width: 52px;
+            text-align: center;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            padding: 4px 4px;
+            font-size: 12px;
+            background: #fff;
+        }
+        .rule-colors-sep { flex: 1; min-width: 6px; }
+        /* ── Condições compostas ──────────────────────────────────── */
+        .rule-conditions-labels {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr 1fr 28px;
+            gap: 6px;
+            padding: 4px 0 2px;
+            border-top: 1px solid #f0f4f8;
+        }
+        .rule-conditions-labels span {
             font-size: 11px;
             font-weight: 600;
             color: #64748b;
             text-transform: uppercase;
         }
-        .card-color-rule-grid {
-            display: grid;
-            grid-template-columns: 1.1fr .9fr 1fr 50px .7fr .7fr .7fr;
-            gap: 6px;
+        .rule-conditions-container {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
         }
-        .card-color-rule-grid input,
-        .card-color-rule-grid select {
+        .rule-condition-row {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr 1fr 28px;
+            gap: 6px;
+            align-items: center;
+        }
+        .rule-condition-row select,
+        .rule-condition-row input[type="text"],
+        .rule-condition-row input[type="number"] {
             width: 100%;
             border: 1px solid #d1d5db;
             border-radius: 6px;
@@ -329,11 +458,37 @@
             font-size: 12px;
             background: #fff;
         }
-        .card-color-rule-grid input[type="color"] {
-            height: 32px;
-            padding: 2px;
+        .btn-add-condition {
+            margin-top: 4px;
+            padding: 4px 10px;
+            font-size: 11px;
+            background: #eff6ff;
+            color: #2563eb;
+            border: 1px solid #bfdbfe;
+            border-radius: 6px;
             cursor: pointer;
+            font-weight: 600;
+            transition: background .12s;
+            align-self: flex-start;
         }
+        .btn-add-condition:hover { background: #dbeafe; }
+        .btn-remove-condition {
+            width: 22px;
+            height: 22px;
+            border: 1px solid #fecaca;
+            background: #fff;
+            color: #b91c1c;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 700;
+            padding: 0;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .btn-remove-condition:disabled { opacity: 0.3; cursor: default; }
         .color-input-wrapper {
             position: relative;
             display: flex;
@@ -754,30 +909,104 @@
         .search-area.collapsed { display: none; }
 
         /* Configurações visuais dos cards de rota */
-        .rotas-visual-config {
-            padding: 14px;
+        /* ====== Card Visual Config (compact inline bar) ====== */
+        .card-visual-config {
+            padding: 8px 14px;
             border-bottom: 1px solid #eef2f7;
             background: #f8fafc;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
         }
-        .rotas-visual-config-head {
-            margin-bottom: 16px;
+        .cvc-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
-        .rotas-visual-config-head strong {
-            display: block;
-            font-size: 13px;
-            color: #0f172a;
-            margin-bottom: 4px;
-        }
-        .rotas-visual-config-head small {
-            display: block;
+        .cvc-group-label {
+            font-size: 10px;
+            font-weight: 700;
             color: #64748b;
-            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            white-space: nowrap;
         }
-        .rotas-visual-config-content {
+        .cvc-swatch {
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            align-items: center;
+            gap: 3px;
         }
+        .cvc-swatch span {
+            font-size: 9px;
+            color: #94a3b8;
+            white-space: nowrap;
+        }
+        .cvc-swatch input[type="color"] {
+            width: 28px;
+            height: 24px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            cursor: pointer;
+            padding: 1px;
+        }
+        .cvc-swatch.rotas-only input[type="color"]:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+        .cvc-swatch.rotas-only span {
+            opacity: 0.5;
+                /* Quando a aba ativa é pedidos, reforçar visualmente o estado desabilitado */
+                .card-visual-config[data-tipo="pedidos"] .cvc-swatch.rotas-only input[type="color"] {
+                    opacity: 0.35;
+                    cursor: not-allowed;
+                    pointer-events: none;
+                }
+                .card-visual-config[data-tipo="pedidos"] .cvc-swatch.rotas-only span {
+                    opacity: 0.5;
+                }
+        }
+        .cvc-num {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3px;
+        }
+        .cvc-num span {
+            font-size: 9px;
+            color: #94a3b8;
+            white-space: nowrap;
+        }
+        .cvc-num input[type="number"] {
+            width: 42px;
+            padding: 3px 5px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 11px;
+            text-align: center;
+        }
+        .cvc-divider {
+            width: 1px;
+            height: 32px;
+            background: #e2e8f0;
+            flex-shrink: 0;
+        }
+        .cvc-save-btn {
+            margin-left: auto;
+            border: 1px solid #059669;
+            background: #10b981;
+            color: #fff;
+            border-radius: 6px;
+            padding: 5px 12px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
+            transition: background 0.2s;
+        }
+        .cvc-save-btn:hover { background: #059669; }
+        /* ====== rotas-config-section: ainda usada no modal Opções de Rota ====== */
         .rotas-config-section {
             background: #fff;
             padding: 12px;
@@ -805,6 +1034,10 @@
         }
         .rotas-config-checkbox input[type="checkbox"] {
             cursor: pointer;
+        }
+        .rotas-config-actions {
+            display: flex;
+            justify-content: flex-end;
         }
         .rotas-config-colors {
             display: grid;
@@ -850,24 +1083,6 @@
             border-radius: 6px;
             font-size: 12px;
         }
-        .rotas-config-actions {
-            display: flex;
-            justify-content: flex-end;
-        }
-        .btn-save-rotas-visual {
-            border: 1px solid #059669;
-            background: #10b981;
-            color: #fff;
-            border-radius: 6px;
-            padding: 8px 16px;
-            cursor: pointer;
-            font-size: 12px;
-            font-weight: 700;
-            transition: background 0.2s;
-        }
-        .btn-save-rotas-visual:hover {
-            background: #059669;
-        }
         .card-type-selector {
             padding: 10px 14px;
             border-bottom: 1px solid #eef2f7;
@@ -883,6 +1098,25 @@
         .card-type-buttons {
             display: flex;
             gap: 8px;
+        }
+        .card-type-actions {
+            margin-top: 8px;
+            display: flex;
+            justify-content: flex-end;
+        }
+        .btn-card-rules {
+            border: 1px solid #cbd5e1;
+            background: #fff;
+            color: #334155;
+            border-radius: 8px;
+            padding: 6px 10px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        .btn-card-rules:hover {
+            border-color: #94a3b8;
+            background: #f8fafc;
         }
         .btn-card-type {
             flex: 1;
@@ -926,12 +1160,27 @@
         .card-fields-main {
             display:flex;
             align-items:center;
+            justify-content:flex-start;
             gap:8px;
             margin-bottom:6px;
             grid-column: 1 / -1;
         }
-        .card-fields-main input[type="checkbox"] { margin-top: 0; }
-        .card-fields-name { font-weight: 700; color:#0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+        .card-fields-main input[type="checkbox"] {
+            margin-top: 0;
+            width: 16px;
+            height: 16px;
+            flex: 0 0 auto;
+        }
+        .card-fields-name {
+            font-weight: 700;
+            color:#0f172a;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex: 1 1 auto;
+            min-width: 0;
+            text-align: left;
+        }
         .card-fields-order {
             margin-left: auto;
             display: inline-flex;
@@ -1086,15 +1335,32 @@
         .card-fields-dialog.rules-focus #btnCamposNenhum {
             display: none !important;
         }
+        .card-color-rules {
+            display: none !important;
+        }
         .card-fields-dialog.rules-focus .card-color-rules {
-            margin-top: 10px;
-            flex: 1;
-            display: flex;
+            display: flex !important;
             flex-direction: column;
+            flex: 1;
+            margin-top: 10px;
         }
         .card-fields-dialog.rules-focus .card-color-rules-list {
             max-height: none;
             flex: 1;
+        }
+        .card-fields-dialog.rules-focus .btn-back-rules {
+            display: inline-flex;
+            align-items: center;
+        }
+        .card-fields-dialog.rules-focus .btn-add-regra-cor {
+            display: inline-flex;
+            align-items: center;
+        }
+        .card-fields-dialog.rules-focus .btn-open-rules-inline {
+            display: none;
+        }
+        .card-fields-dialog.rules-focus .card-color-rules-footer {
+            display: flex;
         }
         .toast-container {
             position: fixed;
@@ -1130,7 +1396,7 @@
         .pedido-card {
             background: var(--pedidos-card-bg);
             border: 1px solid var(--pedidos-card-border);
-            border-radius: 10px;
+            border-radius: var(--pedidos-card-raio, 10px);
             padding: var(--pedidos-card-pad-y) var(--pedidos-card-pad-x);
             margin-bottom: 8px;
             font-size: var(--pedidos-card-font);
@@ -1487,7 +1753,6 @@
             <div style="display:flex; gap:6px;">
                 <button type="button" id="btnVerArquivados" class="btn-ver-arquivados" title="Ver pedidos arquivados">🗂 Arq.<span class="arquivados-badge" id="arquivadosBadge" style="display:none">0</span></button>
                 <button type="button" id="btnHistoricoExclusoes" class="btn-ver-arquivados" title="Histórico de pedidos excluídos" style="background:#f0fdf4; color:#166534; border-color:#86efac;">📋 Histórico</button>
-                <button type="button" id="btnAbrirRegrasCor" class="btn-editar-card" title="Configurar regras de cor dos cards">🎨 Regras</button>
                 <button type="button" id="btnTelaCheiaPedidos" class="btn-tela-cheia" title="Expandir painel">⛶ Tela cheia</button>
             </div>
         </div>
@@ -1544,6 +1809,9 @@
                     🗺️ Cards de Rota
                 </button>
             </div>
+            <div class="card-type-actions">
+                <button type="button" id="btnAbrirRegrasCards" class="btn-card-rules" title="Configurar regras de cor para o tipo de card selecionado">🎨 Regras</button>
+            </div>
         </div>
         
         <div class="card-fields-toolbar">
@@ -1558,62 +1826,57 @@
                     <strong>Condições de cor do card</strong>
                     <small>Primeira regra que bater será aplicada no card.</small>
                 </div>
-                <button type="button" id="btnAdicionarRegraCor" class="btn-add-regra-cor">+ Regras</button>
+                <div class="card-color-rules-actions">
+                    <button type="button" id="btnIrParaRegrasCard" class="btn-open-rules-inline" title="Abrir a tela de regras em modo focado">↗ Ir para regras</button>
+                    <button type="button" id="btnVoltarCamposCard" class="btn-back-rules" title="Voltar para configuração dos campos">← Voltar aos campos</button>
+                    <button type="button" id="btnAdicionarRegraCor" class="btn-add-regra-cor">+ Regras</button>
+                </div>
             </div>
             <div id="cardColorRulesList" class="card-color-rules-list"></div>
+            <div class="card-color-rules-footer">
+                <button type="button" id="btnAdicionarRegraCorFooter" class="btn-rules-footer add">+ Nova regra</button>
+                <button type="button" id="btnVoltarCamposCardFooter" class="btn-rules-footer">← Voltar aos campos</button>
+            </div>
         </div>
-        <div id="rotasVisualConfig" class="rotas-visual-config" style="display:none;">
-            <div class="rotas-visual-config-head">
-                <strong>🎨 Configurações Visuais dos Cards de Rota</strong>
-                <small>Personalize a aparência dos cards de paradas na rota</small>
+        <div id="rotasVisualConfig" class="card-visual-config" data-tipo="rotas" style="display:none;">
+            <!-- Grupo: Cores -->
+            <span class="cvc-group-label">Cores</span>
+            <div class="cvc-group">
+                <label class="cvc-swatch">
+                    <span>Fundo</span>
+                    <input type="color" id="rotasConfigCorFundo" value="#ffffff">
+                </label>
+                <label class="cvc-swatch">
+                    <span>Borda</span>
+                    <input type="color" id="rotasConfigCorBorda" value="#dadce0">
+                </label>
+                <label class="cvc-swatch rotas-only">
+                    <span>Nº</span>
+                    <input type="color" id="rotasConfigCorNumero" value="#4285F4">
+                </label>
             </div>
-            <div class="rotas-visual-config-content">
-                <div class="rotas-config-section">
-                    <label class="rotas-config-label">
-                        <strong>Cores</strong>
-                    </label>
-                    <div class="rotas-config-colors">
-                        <label class="rotas-config-color-input">
-                            <span>Fundo</span>
-                            <input type="color" id="rotasConfigCorFundo" value="#ffffff">
-                        </label>
-                        <label class="rotas-config-color-input">
-                            <span>Borda</span>
-                            <input type="color" id="rotasConfigCorBorda" value="#dadce0">
-                        </label>
-                        <label class="rotas-config-color-input">
-                            <span>Número</span>
-                            <input type="color" id="rotasConfigCorNumero" value="#4285F4">
-                        </label>
-                    </div>
-                </div>
-                <div class="rotas-config-section">
-                    <label class="rotas-config-label">
-                        <strong>Dimensões</strong>
-                    </label>
-                    <div class="rotas-config-dimensions">
-                        <label class="rotas-config-dimension-input">
-                            <span>Tamanho da fonte (px)</span>
-                            <input type="number" id="rotasConfigTamanhoFonte" value="13" min="8" max="24">
-                        </label>
-                        <label class="rotas-config-dimension-input">
-                            <span>Padding vertical (px)</span>
-                            <input type="number" id="rotasConfigPaddingV" value="12" min="0" max="32">
-                        </label>
-                        <label class="rotas-config-dimension-input">
-                            <span>Padding horizontal (px)</span>
-                            <input type="number" id="rotasConfigPaddingH" value="12" min="0" max="32">
-                        </label>
-                        <label class="rotas-config-dimension-input">
-                            <span>Raio da borda (px)</span>
-                            <input type="number" id="rotasConfigRaio" value="8" min="0" max="32">
-                        </label>
-                    </div>
-                </div>
-                <div class="rotas-config-actions">
-                    <button type="button" id="btnSalvarRotasVisual" class="btn-save-rotas-visual">💾 Salvar Configurações Visuais</button>
-                </div>
+            <div class="cvc-divider"></div>
+            <!-- Grupo: Dimensões -->
+            <span class="cvc-group-label">Dimens.</span>
+            <div class="cvc-group">
+                <label class="cvc-num">
+                    <span>Fonte</span>
+                    <input type="number" id="rotasConfigTamanhoFonte" value="13" min="8" max="24">
+                </label>
+                <label class="cvc-num">
+                    <span>Pad↕</span>
+                    <input type="number" id="rotasConfigPaddingV" value="12" min="0" max="32">
+                </label>
+                <label class="cvc-num">
+                    <span>Pad↔</span>
+                    <input type="number" id="rotasConfigPaddingH" value="12" min="0" max="32">
+                </label>
+                <label class="cvc-num">
+                    <span>Raio</span>
+                    <input type="number" id="rotasConfigRaio" value="8" min="0" max="32">
+                </label>
             </div>
+            <button type="button" id="btnSalvarRotasVisual" class="cvc-save-btn">💾 Salvar</button>
         </div>
         
         <div class="card-fields-footer">
@@ -1754,7 +2017,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const panelEl = document.getElementById('pedidos-panel');
     const btnTelaCheia = document.getElementById('btnTelaCheiaPedidos');
     const btnEditarCard = document.getElementById('btnEditarCardPedidos');
-    const btnAbrirRegrasCor = document.getElementById('btnAbrirRegrasCor');
     const countEl = document.getElementById('pedidosCountIndex');
     const filterEl = document.getElementById('filterPedidosIndex');
     const rotasCheckboxListEl = document.getElementById('rotasCheckboxList');
@@ -1773,6 +2035,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const cardFieldsSearchEl = document.getElementById('cardFieldsSearch');
     const cardColorRulesListEl = document.getElementById('cardColorRulesList');
     const btnAdicionarRegraCor = document.getElementById('btnAdicionarRegraCor');
+    const btnAdicionarRegraCorFooter = document.getElementById('btnAdicionarRegraCorFooter');
+    const btnIrParaRegrasCard = document.getElementById('btnIrParaRegrasCard');
+    const btnVoltarCamposCard = document.getElementById('btnVoltarCamposCard');
+    const btnVoltarCamposCardFooter = document.getElementById('btnVoltarCamposCardFooter');
     const btnExpandirModalCard = document.getElementById('btnExpandirModalCard');
     const btnCamposTodos = document.getElementById('btnCamposTodos');
     const btnCamposNenhum = document.getElementById('btnCamposNenhum');
@@ -1781,6 +2047,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const toastContainerEl = document.getElementById('toastContainer');
     const btnCardTipoPedidos = document.getElementById('btnCardTipoPedidos');
     const btnCardTipoRotas = document.getElementById('btnCardTipoRotas');
+    const btnAbrirRegrasCards = document.getElementById('btnAbrirRegrasCards');
     const btnRotasOpcoes = document.getElementById('btnRotasOpcoes');
     const rotasOpcoesModalEl = document.getElementById('rotasOpcoesModal');
     const btnFecharOpcoesRota = document.getElementById('btnFecharOpcoesRota');
@@ -2277,22 +2544,42 @@ document.addEventListener('DOMContentLoaded', function () {
     function normalizeRegraCorConfig(regra, idx = 0) {
         if (!regra || typeof regra !== 'object') {
             return {
-                campo: '',
-                operador: 'igual',
-                valor: '',
+                nome: '',
+                logica: 'AND',
+                condicoes: [{ campo: '', operador: 'igual', valor: '', valor2: '' }],
                 cor_fundo: '',
                 cor_borda: '',
                 cor_texto: '',
+                espessura_borda: '',
                 ativo: true,
                 prioridade: idx + 1,
             };
         }
 
+        // Normaliza array de condições — migra formato antigo (campo/operador/valor no topo)
+        let condicoes;
+        if (Array.isArray(regra.condicoes) && regra.condicoes.length > 0) {
+            condicoes = regra.condicoes.map(c => ({
+                campo: String(c.campo || '').trim(),
+                operador: String(c.operador || 'igual').trim() || 'igual',
+                valor: String(c.valor ?? '').trim(),
+                valor2: String(c.valor2 ?? '').trim(),
+            }));
+        } else if (regra.campo) {
+            condicoes = [{
+                campo: String(regra.campo || '').trim(),
+                operador: String(regra.operador || 'igual').trim() || 'igual',
+                valor: String(regra.valor ?? '').trim(),
+                valor2: String(regra.valor2 ?? '').trim(),
+            }];
+        } else {
+            condicoes = [{ campo: '', operador: 'igual', valor: '', valor2: '' }];
+        }
+
         return {
-            campo: String(regra.campo || '').trim(),
-            operador: String(regra.operador || 'igual').trim() || 'igual',
-            valor: String(regra.valor ?? '').trim(),
-            valor2: String(regra.valor2 ?? '').trim(),
+            nome: String(regra.nome || '').trim(),
+            logica: regra.logica === 'OR' ? 'OR' : 'AND',
+            condicoes,
             cor_fundo: String(regra.cor_fundo || '').trim(),
             cor_borda: String(regra.cor_borda || '').trim(),
             cor_texto: String(regra.cor_texto || '').trim(),
@@ -2378,16 +2665,16 @@ document.addEventListener('DOMContentLoaded', function () {
         return (Date.now() - d.getTime()) / 3600000;
     }
 
-    function regraCorCombina(rule, pedido) {
-        const raw = getFieldValue(pedido, rule.campo);
+    function _avaliarCondicaoPedido(cond, pedido) {
+        const raw = getFieldValue(pedido, cond.campo);
         const atual = raw === null || raw === undefined ? '' : String(raw).trim();
-        const alvo = String(rule.valor || '').trim();
+        const alvo = String(cond.valor || '').trim();
         const atualLower = atual.toLowerCase();
         const alvoLower = alvo.toLowerCase();
         const nAtual = tryParseNumber(atual);
         const nAlvo = tryParseNumber(alvo);
 
-        switch (rule.operador) {
+        switch (cond.operador) {
             case 'igual':
                 return atualLower === alvoLower;
             case 'diferente':
@@ -2440,7 +2727,7 @@ document.addEventListener('DOMContentLoaded', function () {
             case 'dias_entre': {
                 const dd = diffDaysFromToday(atual);
                 const min = Math.round(parseFloat(alvo));
-                const max = Math.round(parseFloat(String(rule.valor2 || '')));
+                const max = Math.round(parseFloat(String(cond.valor2 || '')));
                 return dd !== null && !isNaN(min) && !isNaN(max) && dd >= min && dd <= max;
             }
             default:
@@ -2448,9 +2735,25 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function regraCorCombina(rule, pedido) {
+        // Novo formato: array de condições com lógica AND/OR
+        const condicoes = Array.isArray(rule.condicoes) ? rule.condicoes.filter(c => c.campo) : [];
+        if (condicoes.length > 0) {
+            if (rule.logica === 'OR') {
+                return condicoes.some(c => _avaliarCondicaoPedido(c, pedido));
+            }
+            return condicoes.every(c => _avaliarCondicaoPedido(c, pedido));
+        }
+        // Compatibilidade com formato antigo (campo/operador/valor no topo)
+        if (rule.campo) {
+            return _avaliarCondicaoPedido(rule, pedido);
+        }
+        return false;
+    }
+
     function getRegraCorAplicada(pedido) {
         const ativasOrdenadas = regrasCorAtivas
-            .filter(rule => rule.ativo && rule.campo)
+            .filter(rule => rule.ativo && (Array.isArray(rule.condicoes) ? rule.condicoes.some(c => c.campo) : rule.campo))
             .sort((a, b) => (a.prioridade || 9999) - (b.prioridade || 9999));
 
         return ativasOrdenadas.find(rule => regraCorCombina(rule, pedido)) || null;
@@ -2625,14 +2928,39 @@ document.addEventListener('DOMContentLoaded', function () {
             { value: 'horas_menor', label: '⏱ Horas menor que' },
         ];
 
+        function buildCondRow(ruleIdx, cond, condIdx, condCount) {
+            const camposOpcoes = Array.from(new Set([cond.campo, ...camposDisponiveis].filter(Boolean)));
+            const optsCampo = camposOpcoes.map(c =>
+                `<option value="${escapeHtml(c)}" ${c === cond.campo ? 'selected' : ''}>${escapeHtml(c)}</option>`
+            ).join('');
+            const optsOper = operadores.map(o =>
+                `<option value="${o.value}" ${o.value === cond.operador ? 'selected' : ''}>${o.label}</option>`
+            ).join('');
+
+            let valorHtml;
+            if (cond.operador === 'dias_entre') {
+                valorHtml = `<div class="rule-valor-entre">
+                    <input type="number" data-rck="valor" value="${escapeHtml(cond.valor || '')}" placeholder="De" min="0" title="Mínimo de dias">
+                    <span>—</span>
+                    <input type="number" data-rck="valor2" value="${escapeHtml(cond.valor2 || '')}" placeholder="Até" min="0" title="Máximo de dias">
+                   </div>`;
+            } else if (SEM_VALOR_OPERADORES.has(cond.operador)) {
+                valorHtml = `<input type="text" data-rck="valor" disabled placeholder="(sem valor)" style="background:#f1f5f9;color:#94a3b8;">`;
+            } else {
+                valorHtml = `<input type="text" data-rck="valor" value="${escapeHtml(cond.valor || '')}" placeholder="Valor comparado">`;
+            }
+
+            return `<div class="rule-condition-row" data-rule-idx="${ruleIdx}" data-cond-idx="${condIdx}">
+                    <select data-rck="campo">${optsCampo}</select>
+                    <select data-rck="operador">${optsOper}</select>
+                    ${valorHtml}
+                    <button type="button" class="btn-remove-condition" data-cond-action="remove-cond" title="Remover condição"${condCount <= 1 ? ' disabled' : ''}>×</button>
+                </div>`;
+        }
+
         cardColorRulesListEl.innerHTML = regrasCorDraft.map((rule, index) => {
-            const camposOpcoes = Array.from(new Set([rule.campo, ...camposDisponiveis].filter(Boolean)));
-            const optionsCampo = camposOpcoes
-                .map((campo) => `<option value="${escapeHtml(campo)}" ${campo === rule.campo ? 'selected' : ''}>${escapeHtml(campo)}</option>`)
-                .join('');
-            const optionsOperador = operadores
-                .map((op) => `<option value="${op.value}" ${op.value === rule.operador ? 'selected' : ''}>${op.label}</option>`)
-                .join('');
+            const condicoes = rule.condicoes || [];
+            const condRows = condicoes.map((cond, ci) => buildCondRow(index, cond, ci, condicoes.length)).join('');
 
             return `
                 <div class="card-color-rule-item" data-rule-idx="${index}">
@@ -2640,51 +2968,51 @@ document.addEventListener('DOMContentLoaded', function () {
                         <input type="checkbox" data-rk="ativo" ${rule.ativo ? 'checked' : ''} title="Ativa">
                         <b>#${index + 1}</b>
                         <span>Quando</span>
+                        <input type="text" class="rule-name-input" data-rk="nome" value="${escapeHtml(rule.nome || '')}" placeholder="Nome da regra (motivo da cor)">
                         <div class="card-color-rule-order">
                             <button type="button" data-rule-action="up" ${index === 0 ? 'disabled' : ''}>↑</button>
                             <button type="button" data-rule-action="down" ${index >= regrasCorDraft.length - 1 ? 'disabled' : ''}>↓</button>
-                            <button type="button" class="btn-remover-regra-cor" data-rule-action="remove" title="Remover">×</button>
+                            <button type="button" class="btn-remover-regra-cor" data-rule-action="remove" title="Remover regra">×</button>
                         </div>
                     </div>
-                    <div class="card-color-rule-labels">
-                        <span>Campo</span>
-                        <span>Operador</span>
-                        <span>${rule.operador === 'dias_entre' ? 'De / Até (dias)' : 'Valor'}</span>
-                        <span title="Espessura da borda (px)">Esp.</span>
-                        <span>Cor Fundo</span>
-                        <span>Cor Borda</span>
-                        <span>Cor Texto</span>
-                    </div>
-                    <div class="card-color-rule-grid">
-                        <select data-rk="campo">${optionsCampo}</select>
-                        <select data-rk="operador">${optionsOperador}</select>
-                        ${rule.operador === 'dias_entre'
-                            ? `<div class="rule-valor-entre">
-                                <input type="number" data-rk="valor" value="${escapeHtml(rule.valor || '')}" placeholder="De" min="0" title="Mínimo de dias">
-                                <span>—</span>
-                                <input type="number" data-rk="valor2" value="${escapeHtml(rule.valor2 || '')}" placeholder="Até" min="0" title="Máximo de dias">
-                               </div>`
-                            : SEM_VALOR_OPERADORES.has(rule.operador)
-                                ? `<input type="text" data-rk="valor" disabled placeholder="(sem valor)" style="background:#f1f5f9;color:#94a3b8;">`
-                                : `<input type="text" data-rk="valor" value="${escapeHtml(rule.valor || '')}" placeholder="Valor comparado">`
-                        }
-                        <input type="number" data-rk="espessura_borda" value="${rule.espessura_borda !== undefined && rule.espessura_borda !== '' ? rule.espessura_borda : ''}" min="0" max="20" placeholder="px" title="Espessura da borda em pixels" style="text-align:center;">
+                    <div class="rule-colors-row">
+                        <label class="rule-logic-label">Lógica:</label>
+                        <select class="rule-logic-select" data-rk="logica">
+                            <option value="AND" ${rule.logica !== 'OR' ? 'selected' : ''}>E (todas)</option>
+                            <option value="OR" ${rule.logica === 'OR' ? 'selected' : ''}>OU (qualquer)</option>
+                        </select>
+                        <span class="rule-colors-sep"></span>
+                        <label class="rule-colors-label" title="Espessura da borda (px)">Esp.</label>
+                        <input type="number" data-rk="espessura_borda" value="${rule.espessura_borda !== undefined && rule.espessura_borda !== '' ? rule.espessura_borda : ''}" min="0" max="20" placeholder="px" title="Espessura da borda em pixels" class="rule-esp-input">
+                        <label class="rule-colors-label">Fundo</label>
                         <div class="color-input-wrapper">
                             <input type="color" data-rk="cor_fundo" value="${rule.cor_fundo || '#ffffff'}" title="Cor de fundo">
                             <button type="button" class="btn-palette-open" data-palette-field="cor_fundo" title="Paleta de cores">🎨</button>
-                            <button type="button" class="btn-reset-color" data-reset-color="cor_fundo" title="Limpar cor de fundo">×</button>
+                            <button type="button" class="btn-reset-color" data-reset-color="cor_fundo" title="Limpar">×</button>
                         </div>
+                        <label class="rule-colors-label">Borda</label>
                         <div class="color-input-wrapper">
                             <input type="color" data-rk="cor_borda" value="${rule.cor_borda || '#dfe3e8'}" title="Cor da borda">
                             <button type="button" class="btn-palette-open" data-palette-field="cor_borda" title="Paleta de cores">🎨</button>
-                            <button type="button" class="btn-reset-color" data-reset-color="cor_borda" title="Limpar cor de borda">×</button>
+                            <button type="button" class="btn-reset-color" data-reset-color="cor_borda" title="Limpar">×</button>
                         </div>
+                        <label class="rule-colors-label">Texto</label>
                         <div class="color-input-wrapper">
                             <input type="color" data-rk="cor_texto" value="${rule.cor_texto || '#000000'}" title="Cor do texto">
                             <button type="button" class="btn-palette-open" data-palette-field="cor_texto" title="Paleta de cores">🎨</button>
-                            <button type="button" class="btn-reset-color" data-reset-color="cor_texto" title="Limpar cor de texto">×</button>
+                            <button type="button" class="btn-reset-color" data-reset-color="cor_texto" title="Limpar">×</button>
                         </div>
                     </div>
+                    <div class="rule-conditions-labels">
+                        <span>Campo</span>
+                        <span>Operador</span>
+                        <span>Valor</span>
+                        <span></span>
+                    </div>
+                    <div class="rule-conditions-container">
+                        ${condRows}
+                    </div>
+                    <button type="button" class="btn-add-condition" data-rule-idx="${index}" data-rule-action="add-cond">+ Condição</button>
                 </div>
             `;
         }).join('');
@@ -2705,7 +3033,7 @@ document.addEventListener('DOMContentLoaded', function () {
             <div class="card-fields-item" data-item-campo="${item.campo}">
                 <div class="card-fields-main">
                     <input type="checkbox" data-k="selected" ${item.selected ? 'checked' : ''}>
-                    <span class="card-fields-name">${item.campo}</span>
+                    <span class="card-fields-name" title="${item.campo || ''}">${(item.campo || '').replace(/_/g, ' ')}</span>
                     <div class="card-fields-order">
                         <b>#${camposCardDraft.findIndex(x => x.campo === item.campo) + 1}</b>
                         <button type="button" data-action="up" ${camposCardDraft.findIndex(x => x.campo === item.campo) <= 0 ? 'disabled' : ''}>↑</button>
@@ -2741,7 +3069,10 @@ document.addEventListener('DOMContentLoaded', function () {
         cardFieldsDialogEl.classList.toggle('rules-focus', isRules);
 
         if (cardFieldsTitleEl) {
-            cardFieldsTitleEl.textContent = isRules ? 'Regras de cor dos cards' : 'Campos do card de pedidos';
+            const tipoLabel = currentCardType === 'rotas' ? 'rota' : 'pedidos';
+            cardFieldsTitleEl.textContent = isRules
+                ? `Regras de cor dos cards de ${tipoLabel}`
+                : `Campos do card de ${tipoLabel}`;
         }
     }
 
@@ -2749,10 +3080,11 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!cardFieldsModalEl) return;
         aplicarModoModalCard(mode);
         applyModalSizeState();
+
         // Usar o mapa correto baseado no tipo de card atual
         const mapaInicial = currentCardType === 'rotas' ? mapaCamposIniciaisRotas : mapaCamposIniciais;
         const camposAtivos = currentCardType === 'rotas' ? camposRotas : campos;
-        
+
         const ativosMap = new Map(camposAtivos.map(item => [item.campo, { ...defaultsCampo(item.campo), ...item }]));
         const ativosOrdenados = camposAtivos.map(item => item.campo).filter(campo => camposDisponiveis.includes(campo));
         const camposOrdenados = [...ativosOrdenados, ...camposDisponiveis.filter(campo => !ativosOrdenados.includes(campo))];
@@ -2770,12 +3102,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 altura: base.altura || '',
             };
         });
+
         regrasCorDraft = regrasCorAtivas.map((rule, idx) => normalizeRegraCorConfig({ ...rule, prioridade: idx + 1 }, idx));
         if (cardFieldsSearchEl) cardFieldsSearchEl.value = '';
+
         renderCamposModal();
         renderRegrasCorModal();
         cardFieldsModalEl.classList.add('open');
         cardFieldsModalEl.setAttribute('aria-hidden', 'false');
+
+        // Garantir seção visual inicializada ao abrir o modal
+        switchCardType(currentCardType);
 
         if (modalCardMode === 'rules') {
             setTimeout(() => {
@@ -2786,98 +3123,130 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    function carregarConfiguracoesRotasVisual() {
-        // Usar valores das variáveis globais definidas no template
-        const config = window.rotasVisualConfigData;
+    function carregarConfiguracoesRotasVisual() { carregarConfiguracoesVisual('rotas'); }
+
+    function carregarConfiguracoesVisual(tipo) {
+        const config = tipo === 'rotas' ? window.rotasVisualConfigData : window.pedidosVisualConfigData;
         if (!config) return;
-        
-        const mostrarNumero = document.getElementById('rotasConfigMostrarNumero');
+
         const corFundo = document.getElementById('rotasConfigCorFundo');
         const corBorda = document.getElementById('rotasConfigCorBorda');
-        const corNumero = document.getElementById('rotasConfigCorNumero');
         const tamanhoFonte = document.getElementById('rotasConfigTamanhoFonte');
         const paddingV = document.getElementById('rotasConfigPaddingV');
         const paddingH = document.getElementById('rotasConfigPaddingH');
         const raio = document.getElementById('rotasConfigRaio');
-        
-        if (mostrarNumero) mostrarNumero.checked = config.mostrar_numero;
+
         if (corFundo) corFundo.value = config.cor_fundo;
         if (corBorda) corBorda.value = config.cor_borda;
-        if (corNumero) corNumero.value = config.cor_numero;
         if (tamanhoFonte) tamanhoFonte.value = config.tamanho_fonte;
         if (paddingV) paddingV.value = config.padding_vertical;
         if (paddingH) paddingH.value = config.padding_horizontal;
         if (raio) raio.value = config.raio;
+
+        if (tipo === 'rotas') {
+            const corNumero = document.getElementById('rotasConfigCorNumero');
+            const mostrarNumero = document.getElementById('rotasConfigMostrarNumero');
+            if (corNumero) corNumero.value = config.cor_numero;
+            if (mostrarNumero) mostrarNumero.checked = config.mostrar_numero;
+        }
+
+        // Atualizar estado habilitado/desabilitado do campo Nº
+        const rotasOnlyEl = document.querySelector('#rotasVisualConfig .rotas-only input');
+        if (rotasOnlyEl) rotasOnlyEl.disabled = (tipo !== 'rotas');
     }
 
-    function salvarConfiguracoesRotasVisual(silent = false) {
-        const mostrarNumero = document.getElementById('rotasConfigMostrarNumero');
+    function salvarConfiguracoesRotasVisual(silent = false) { return salvarConfiguracoesVisual('rotas', silent); }
+
+    function salvarConfiguracoesVisual(tipo, silent = false) {
         const corFundo = document.getElementById('rotasConfigCorFundo');
         const corBorda = document.getElementById('rotasConfigCorBorda');
-        const corNumero = document.getElementById('rotasConfigCorNumero');
         const tamanhoFonte = document.getElementById('rotasConfigTamanhoFonte');
         const paddingV = document.getElementById('rotasConfigPaddingV');
         const paddingH = document.getElementById('rotasConfigPaddingH');
         const raio = document.getElementById('rotasConfigRaio');
-        
-        const dados = {
-            rotas_card_mostrar_numero: mostrarNumero ? mostrarNumero.checked : true,
-            rotas_card_cor_fundo: corFundo ? corFundo.value : '#ffffff',
-            rotas_card_cor_borda: corBorda ? corBorda.value : '#dadce0',
-            rotas_card_cor_numero: corNumero ? corNumero.value : '#4285F4',
-            rotas_card_tamanho_fonte: tamanhoFonte ? parseInt(tamanhoFonte.value) : 13,
-            rotas_card_padding_vertical: paddingV ? parseInt(paddingV.value) : 12,
-            rotas_card_padding_horizontal: paddingH ? parseInt(paddingH.value) : 12,
-            rotas_card_raio: raio ? parseInt(raio.value) : 8
-        };
-        
-        return fetch('{% url "rotas:salvar_config_visual_rotas" %}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCsrfToken()
-            },
-            body: JSON.stringify(dados)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Atualizar configurações visuais no app.js em tempo real
-                const novaConfig = {
-                    mostrar_numero: dados.rotas_card_mostrar_numero
-                };
-                window.rotasCardConfig = novaConfig;
-                if (typeof rotasCardConfig !== 'undefined') {
-                    rotasCardConfig = novaConfig;
+
+        const root = document.documentElement;
+
+        if (tipo === 'rotas') {
+            const mostrarNumero = document.getElementById('rotasConfigMostrarNumero');
+            const corNumero = document.getElementById('rotasConfigCorNumero');
+            const dados = {
+                rotas_card_mostrar_numero: mostrarNumero ? mostrarNumero.checked : true,
+                rotas_card_cor_fundo: corFundo ? corFundo.value : '#ffffff',
+                rotas_card_cor_borda: corBorda ? corBorda.value : '#dadce0',
+                rotas_card_cor_numero: corNumero ? corNumero.value : '#4285F4',
+                rotas_card_tamanho_fonte: tamanhoFonte ? parseInt(tamanhoFonte.value) : 13,
+                rotas_card_padding_vertical: paddingV ? parseInt(paddingV.value) : 12,
+                rotas_card_padding_horizontal: paddingH ? parseInt(paddingH.value) : 12,
+                rotas_card_raio: raio ? parseInt(raio.value) : 8
+            };
+            return fetch('{% url "rotas:salvar_config_visual_rotas" %}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+                body: JSON.stringify(dados)
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    const novaConfig = { mostrar_numero: dados.rotas_card_mostrar_numero };
+                    window.rotasCardConfig = novaConfig;
+                    if (typeof rotasCardConfig !== 'undefined') rotasCardConfig = novaConfig;
+                    root.style.setProperty('--rotas-card-bg', dados.rotas_card_cor_fundo);
+                    root.style.setProperty('--rotas-card-border', dados.rotas_card_cor_borda);
+                    root.style.setProperty('--rotas-card-font', dados.rotas_card_tamanho_fonte + 'px');
+                    root.style.setProperty('--rotas-card-pad-y', dados.rotas_card_padding_vertical + 'px');
+                    root.style.setProperty('--rotas-card-pad-x', dados.rotas_card_padding_horizontal + 'px');
+                    root.style.setProperty('--rotas-card-raio', dados.rotas_card_raio + 'px');
+                    root.style.setProperty('--rotas-card-numero-cor', dados.rotas_card_cor_numero);
+                    if (typeof renderStops === 'function') renderStops();
+                    if (!silent) showToast('✅ Configurações visuais de rotas salvas!', 'success');
+                    return true;
+                } else {
+                    if (!silent) showToast('❌ Erro ao salvar: ' + (data.message || 'Erro desconhecido'), 'error');
+                    throw new Error(data.message || 'Erro desconhecido');
                 }
-                
-                // Atualizar CSS variables em tempo real
-                const root = document.documentElement;
-                root.style.setProperty('--rotas-card-bg', dados.rotas_card_cor_fundo);
-                root.style.setProperty('--rotas-card-border', dados.rotas_card_cor_borda);
-                root.style.setProperty('--rotas-card-font', dados.rotas_card_tamanho_fonte + 'px');
-                root.style.setProperty('--rotas-card-pad-y', dados.rotas_card_padding_vertical + 'px');
-                root.style.setProperty('--rotas-card-pad-x', dados.rotas_card_padding_horizontal + 'px');
-                root.style.setProperty('--rotas-card-raio', dados.rotas_card_raio + 'px');
-                root.style.setProperty('--rotas-card-numero-cor', dados.rotas_card_cor_numero);
-                
-                // Re-renderizar stops
-                if (typeof renderStops === 'function') {
-                    renderStops();
+            })
+            .catch(error => {
+                console.error('Erro ao salvar config visual rotas:', error);
+                if (!silent) showToast('❌ Erro ao salvar configurações', 'error');
+                throw error;
+            });
+        } else {
+            const dados = {
+                pedidos_card_cor_fundo: corFundo ? corFundo.value : '#ffffff',
+                pedidos_card_cor_borda: corBorda ? corBorda.value : '#e0e0e0',
+                pedidos_card_tamanho_fonte: tamanhoFonte ? parseInt(tamanhoFonte.value) : 12,
+                pedidos_card_padding_vertical: paddingV ? parseInt(paddingV.value) : 8,
+                pedidos_card_padding_horizontal: paddingH ? parseInt(paddingH.value) : 8,
+                pedidos_card_raio: raio ? parseInt(raio.value) : 8
+            };
+            return fetch('{% url "rotas:salvar_config_visual_pedidos" %}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+                body: JSON.stringify(dados)
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    root.style.setProperty('--pedidos-card-bg', dados.pedidos_card_cor_fundo);
+                    root.style.setProperty('--pedidos-card-border', dados.pedidos_card_cor_borda);
+                    root.style.setProperty('--pedidos-card-font', dados.pedidos_card_tamanho_fonte + 'px');
+                    root.style.setProperty('--pedidos-card-pad-y', dados.pedidos_card_padding_vertical + 'px');
+                    root.style.setProperty('--pedidos-card-pad-x', dados.pedidos_card_padding_horizontal + 'px');
+                    root.style.setProperty('--pedidos-card-raio', dados.pedidos_card_raio + 'px');
+                    if (!silent) showToast('✅ Configurações visuais de pedidos salvas!', 'success');
+                    return true;
+                } else {
+                    if (!silent) showToast('❌ Erro ao salvar: ' + (data.message || 'Erro desconhecido'), 'error');
+                    throw new Error(data.message || 'Erro desconhecido');
                 }
-                
-                if (!silent) showToast('✅ Configurações visuais salvas e aplicadas!', 'success');
-                return true;
-            } else {
-                if (!silent) showToast('❌ Erro ao salvar: ' + (data.message || 'Erro desconhecido'), 'error');
-                throw new Error(data.message || 'Erro desconhecido');
-            }
-        })
-        .catch(error => {
-            console.error('Erro ao salvar configurações visuais:', error);
-            if (!silent) showToast('❌ Erro ao salvar configurações', 'error');
-            throw error;
-        });
+            })
+            .catch(error => {
+                console.error('Erro ao salvar config visual pedidos:', error);
+                if (!silent) showToast('❌ Erro ao salvar configurações', 'error');
+                throw error;
+            });
+        }
     }
 
     function fecharModalCamposCard() {
@@ -2918,6 +3287,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function renderPedidoCard(pedido) {
         const regraCor = getRegraCorAplicada(pedido);
+        const regraNome = regraCor && regraCor.nome ? String(regraCor.nome).trim() : '';
+        const regraTitleAttr = regraNome ? ` title="Regra aplicada: ${escapeHtml(regraNome)}"` : '';
         const cardStyle = [
             regraCor && regraCor.cor_fundo ? `background:${regraCor.cor_fundo};` : '',
             regraCor && regraCor.cor_borda ? `border-color:${regraCor.cor_borda};` : '',
@@ -2957,7 +3328,7 @@ document.addEventListener('DOMContentLoaded', function () {
             : '';
 
         return `
-            <div class="pedido-card ${pedido.arquivado ? 'is-arquivado' : ''}" data-pedido-id="${pedido.id}" style="${cardStyle}">
+            <div class="pedido-card ${pedido.arquivado ? 'is-arquivado' : ''}" data-pedido-id="${pedido.id}" style="${cardStyle}"${regraTitleAttr}>
                 <div class="pedido-card-top">
                     <div class="numero" style="${regraCor && regraCor.cor_texto ? `color:${regraCor.cor_texto};` : ''}">#${pedido.numero_pedido || '—'}${slotBadge}</div>
                     <div class="pedido-card-btns">
@@ -3081,9 +3452,17 @@ document.addEventListener('DOMContentLoaded', function () {
             abrirModalCamposCard('full');
         });
     }
-    if (btnAbrirRegrasCor) {
-        btnAbrirRegrasCor.addEventListener('click', function () {
-            abrirModalCamposCard('rules');
+    if (btnAbrirRegrasCards) {
+        btnAbrirRegrasCards.addEventListener('click', function () {
+            if (cardFieldsModalEl && cardFieldsModalEl.classList.contains('open')) {
+                aplicarModoModalCard('rules');
+                renderRegrasCorModal();
+                if (cardColorRulesWrapEl && typeof cardColorRulesWrapEl.scrollIntoView === 'function') {
+                    cardColorRulesWrapEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            } else {
+                abrirModalCamposCard('rules');
+            }
         });
     }
 
@@ -3239,7 +3618,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!rotasOpcoesModalEl) return;
             rotasOpcoesModalEl.classList.add('open');
             rotasOpcoesModalEl.setAttribute('aria-hidden', 'false');
-            carregarConfiguracoesRotasVisual();
+            carregarConfiguracoesVisual('rotas');
             carregarConfiguracaoBuscaEndereco();
             _popularSelectOtimizBairro();
         });
@@ -3259,7 +3638,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (btnSalvarOpcoesRota) {
         btnSalvarOpcoesRota.addEventListener('click', async function () {
             try {
-                await salvarConfiguracoesRotasVisual(true);
+                await salvarConfiguracoesVisual('rotas', true);
                 await salvarConfiguracaoBuscaEndereco(true);
                 showToast('✅ Opções de rota salvas com sucesso!', 'success');
                 fecharOpcoesRotaModal();
@@ -3407,44 +3786,33 @@ document.addEventListener('DOMContentLoaded', function () {
             btnCardTipoRotas.classList.toggle('active', tipo === 'rotas');
         }
         
-        // Atualizar título
-        if (cardFieldsTitleEl && modalCardMode === 'full') {
-            cardFieldsTitleEl.textContent = tipo === 'pedidos' 
-                ? 'Campos do card de pedidos' 
-                : 'Campos do card de rota';
-        }
+        // Atualizar título para refletir o tipo atual em qualquer modo (full/rules)
+        aplicarModoModalCard(modalCardMode);
         
         // Mostrar/ocultar seções específicas
         const colorRulesEl = document.querySelector('.card-color-rules');
         const rotasVisualEl = document.getElementById('rotasVisualConfig');
         const cardFieldsToolbarEl = document.querySelector('.card-fields-toolbar');
-        
-        // Para pedidos: mostrar regras de cor; para rotas: mostrar configurações visuais
-        if (colorRulesEl) colorRulesEl.style.display = 'block';  // Mostrar sempre
 
-        // Reposicionar campo de busca e lista para aparecer logo após a configuração visual
-        const cardFieldsToolbarWrap = cardFieldsToolbarEl ? cardFieldsToolbarEl.parentElement : null;
+        // Bloco de regras gerenciado por CSS via rules-focus — não interferir aqui
+
+        // Seção visual config: sempre visível em ambas as abas
+        if (rotasVisualEl) {
+            rotasVisualEl.style.display = 'flex';
+            rotasVisualEl.dataset.tipo = tipo;
+            carregarConfiguracoesVisual(tipo);
+        }
+
+        // Reposicionar toolbar de busca/campos logo após a configuração visual
         const rotasVisualContainer = document.getElementById('rotasVisualConfig');
         if (cardFieldsToolbarEl && rotasVisualContainer) {
-            if (tipo === 'rotas') {
-                rotasVisualContainer.insertAdjacentElement('afterend', cardFieldsToolbarEl);
-            } else {
-                cardFieldsToolbarWrap?.appendChild(cardFieldsToolbarEl);
-            }
+            rotasVisualContainer.insertAdjacentElement('afterend', cardFieldsToolbarEl);
         }
 
         if (cardFieldsToolbarEl) {
-            // Atualizar placeholder da busca
             const searchInput = cardFieldsToolbarEl.querySelector('#cardFieldsSearch');
             if (searchInput) {
                 searchInput.placeholder = tipo === 'pedidos' ? 'Buscar campo do SQL...' : 'Buscar campo...';
-            }
-        }
-        
-        if (rotasVisualEl) {
-            rotasVisualEl.style.display = tipo === 'rotas' ? 'block' : 'none';
-            if (tipo === 'rotas') {
-                carregarConfiguracoesRotasVisual();
             }
         }
         
@@ -3751,16 +4119,22 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const regrasPayload = regrasCorDraft
                 .map((rule, idx) => ({
-                    campo: String(rule.campo || '').trim(),
-                    operador: String(rule.operador || 'igual').trim() || 'igual',
-                    valor: String(rule.valor || '').trim(),
+                    nome: String(rule.nome || '').trim(),
+                    logica: rule.logica === 'OR' ? 'OR' : 'AND',
+                    condicoes: (rule.condicoes || []).map(c => ({
+                        campo: String(c.campo || '').trim(),
+                        operador: String(c.operador || 'igual').trim() || 'igual',
+                        valor: String(c.valor || '').trim(),
+                        valor2: String(c.valor2 || '').trim(),
+                    })).filter(c => c.campo),
                     cor_fundo: String(rule.cor_fundo || '').trim(),
                     cor_borda: String(rule.cor_borda || '').trim(),
                     cor_texto: String(rule.cor_texto || '').trim(),
+                    espessura_borda: rule.espessura_borda !== undefined && rule.espessura_borda !== '' ? Number(rule.espessura_borda) : '',
                     ativo: !!rule.ativo,
                     prioridade: idx + 1,
                 }))
-                .filter(rule => rule.campo && (rule.cor_fundo || rule.cor_borda || rule.cor_texto));
+                .filter(rule => rule.condicoes.length > 0 && (rule.cor_fundo || rule.cor_borda || rule.cor_texto));
 
             btnSalvarCamposCard.disabled = true;
             const oldText = btnSalvarCamposCard.textContent;
@@ -3805,6 +4179,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (typeof rotasCamposExibicao !== 'undefined') {
                         rotasCamposExibicao = camposSalvos;
                     }
+                    window.dispatchEvent(new CustomEvent('rotas-campos-atualizados', {
+                        detail: { campos: camposSalvos }
+                    }));
                     // Atualizar regras de cor de rotas
                     regrasCorRotas = Array.isArray(data.regras_cor)
                         ? data.regras_cor.map((rule, idx) => normalizeRegraCorConfig(rule, idx))
@@ -3843,15 +4220,52 @@ document.addEventListener('DOMContentLoaded', function () {
     const btnSalvarRotasVisual = document.getElementById('btnSalvarRotasVisual');
     if (btnSalvarRotasVisual) {
         btnSalvarRotasVisual.addEventListener('click', function () {
-            salvarConfiguracoesRotasVisual().catch(() => {});
+            salvarConfiguracoesVisual(currentCardType).catch(() => {});
         });
     }
 
+    function adicionarRegraCorDraft() {
+        const campoDefault = camposDisponiveis[0] || '';
+        regrasCorDraft.push(normalizeRegraCorConfig({
+            logica: 'AND',
+            condicoes: [{ campo: campoDefault, operador: 'igual', valor: '' }],
+            ativo: true,
+        }, regrasCorDraft.length));
+        renderRegrasCorModal();
+    }
     if (btnAdicionarRegraCor) {
-        btnAdicionarRegraCor.addEventListener('click', function () {
-            const campoDefault = camposDisponiveis[0] || 'numero_pedido';
-            regrasCorDraft.push(normalizeRegraCorConfig({ campo: campoDefault, operador: 'igual', valor: '', ativo: true }, regrasCorDraft.length));
+        btnAdicionarRegraCor.addEventListener('click', adicionarRegraCorDraft);
+    }
+    if (btnAdicionarRegraCorFooter) {
+        btnAdicionarRegraCorFooter.addEventListener('click', adicionarRegraCorDraft);
+    }
+
+    if (btnVoltarCamposCard) {
+        btnVoltarCamposCard.addEventListener('click', function () {
+            aplicarModoModalCard('full');
+            renderCamposModal();
+            if (cardFieldsListEl && typeof cardFieldsListEl.scrollIntoView === 'function') {
+                cardFieldsListEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    }
+    if (btnVoltarCamposCardFooter) {
+        btnVoltarCamposCardFooter.addEventListener('click', function () {
+            aplicarModoModalCard('full');
+            renderCamposModal();
+            if (cardFieldsListEl && typeof cardFieldsListEl.scrollIntoView === 'function') {
+                cardFieldsListEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    }
+
+    if (btnIrParaRegrasCard) {
+        btnIrParaRegrasCard.addEventListener('click', function () {
+            aplicarModoModalCard('rules');
             renderRegrasCorModal();
+            if (cardColorRulesWrapEl && typeof cardColorRulesWrapEl.scrollIntoView === 'function') {
+                cardColorRulesWrapEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
         });
     }
 
@@ -3862,7 +4276,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (paletteBtn) {
                 event.stopPropagation();
                 const field = paletteBtn.getAttribute('data-palette-field');
-                const ruleItem = paletteBtn.closest('[data-rule-idx]');
+                const ruleItem = paletteBtn.closest('.card-color-rule-item');
                 if (!ruleItem || !field) return;
                 const ruleIdx = Number(ruleItem.getAttribute('data-rule-idx'));
                 if (Number.isNaN(ruleIdx) || ruleIdx < 0 || ruleIdx >= regrasCorDraft.length) return;
@@ -3878,24 +4292,48 @@ document.addEventListener('DOMContentLoaded', function () {
             // Lidar com botões de reset de cor
             const resetBtn = event.target.closest('button[data-reset-color]');
             if (resetBtn) {
-                const itemEl = resetBtn.closest('[data-rule-idx]');
+                const itemEl = resetBtn.closest('.card-color-rule-item');
                 if (!itemEl) return;
                 const idx = Number(itemEl.getAttribute('data-rule-idx'));
                 if (Number.isNaN(idx) || idx < 0 || idx >= regrasCorDraft.length) return;
-                
                 const colorKey = resetBtn.getAttribute('data-reset-color');
-                const defaultColors = { cor_fundo: '#ffffff', cor_borda: '#dfe3e8', cor_texto: '#000000' };
-                if (colorKey && defaultColors[colorKey]) {
-                    regrasCorDraft[idx][colorKey] = '';  // String vazia = não aplicar estilo
+                if (colorKey) {
+                    regrasCorDraft[idx][colorKey] = '';
                     renderRegrasCorModal();
                 }
+                return;
+            }
+
+            // Remover condição individual
+            const condRemoveBtn = event.target.closest('button[data-cond-action="remove-cond"]');
+            if (condRemoveBtn) {
+                const condRow = condRemoveBtn.closest('[data-cond-idx]');
+                if (!condRow) return;
+                const ruleIdx = Number(condRow.getAttribute('data-rule-idx'));
+                const condIdx = Number(condRow.getAttribute('data-cond-idx'));
+                if (Number.isNaN(ruleIdx) || Number.isNaN(condIdx)) return;
+                if (regrasCorDraft[ruleIdx] && regrasCorDraft[ruleIdx].condicoes.length > 1) {
+                    regrasCorDraft[ruleIdx].condicoes.splice(condIdx, 1);
+                    renderRegrasCorModal();
+                }
+                return;
+            }
+
+            // Adicionar condição
+            const addCondBtn = event.target.closest('button[data-rule-action="add-cond"]');
+            if (addCondBtn) {
+                const ruleIdx = Number(addCondBtn.getAttribute('data-rule-idx'));
+                if (Number.isNaN(ruleIdx) || !regrasCorDraft[ruleIdx]) return;
+                const campoDefault = camposDisponiveis[0] || '';
+                regrasCorDraft[ruleIdx].condicoes.push({ campo: campoDefault, operador: 'igual', valor: '', valor2: '' });
+                renderRegrasCorModal();
                 return;
             }
 
             // Lidar com botões de ação (remover, up, down)
             const actionBtn = event.target.closest('button[data-rule-action]');
             if (!actionBtn) return;
-            const itemEl = actionBtn.closest('[data-rule-idx]');
+            const itemEl = actionBtn.closest('.card-color-rule-item');
             if (!itemEl) return;
 
             const idx = Number(itemEl.getAttribute('data-rule-idx'));
@@ -3914,13 +4352,28 @@ document.addEventListener('DOMContentLoaded', function () {
 
         cardColorRulesListEl.addEventListener('input', function (event) {
             const target = event.target;
-            const itemEl = target.closest('[data-rule-idx]');
+
+            // Campo de condição (data-rck)
+            const keyCond = target.getAttribute('data-rck');
+            if (keyCond) {
+                const condRow = target.closest('[data-cond-idx]');
+                if (!condRow) return;
+                const ruleIdx = Number(condRow.getAttribute('data-rule-idx'));
+                const condIdx = Number(condRow.getAttribute('data-cond-idx'));
+                if (Number.isNaN(ruleIdx) || Number.isNaN(condIdx)) return;
+                if (regrasCorDraft[ruleIdx]?.condicoes?.[condIdx]) {
+                    regrasCorDraft[ruleIdx].condicoes[condIdx][keyCond] = target.value;
+                }
+                return;
+            }
+
+            // Campo da regra (data-rk)
+            const itemEl = target.closest('.card-color-rule-item');
             if (!itemEl) return;
             const idx = Number(itemEl.getAttribute('data-rule-idx'));
             if (Number.isNaN(idx) || idx < 0 || idx >= regrasCorDraft.length) return;
             const key = target.getAttribute('data-rk');
             if (!key) return;
-
             if (key === 'ativo') {
                 regrasCorDraft[idx].ativo = !!target.checked;
             } else {
@@ -3930,22 +4383,34 @@ document.addEventListener('DOMContentLoaded', function () {
 
         cardColorRulesListEl.addEventListener('change', function (event) {
             const target = event.target;
-            const itemEl = target.closest('[data-rule-idx]');
+
+            // Campo de condição (data-rck)
+            const keyCond = target.getAttribute('data-rck');
+            if (keyCond) {
+                const condRow = target.closest('[data-cond-idx]');
+                if (!condRow) return;
+                const ruleIdx = Number(condRow.getAttribute('data-rule-idx'));
+                const condIdx = Number(condRow.getAttribute('data-cond-idx'));
+                if (Number.isNaN(ruleIdx) || Number.isNaN(condIdx)) return;
+                if (regrasCorDraft[ruleIdx]?.condicoes?.[condIdx]) {
+                    regrasCorDraft[ruleIdx].condicoes[condIdx][keyCond] = target.value;
+                }
+                // Ao mudar operador, rerenderiza para atualizar UI de valor
+                if (keyCond === 'operador') renderRegrasCorModal();
+                return;
+            }
+
+            // Campo da regra (data-rk)
+            const itemEl = target.closest('.card-color-rule-item');
             if (!itemEl) return;
             const idx = Number(itemEl.getAttribute('data-rule-idx'));
             if (Number.isNaN(idx) || idx < 0 || idx >= regrasCorDraft.length) return;
             const key = target.getAttribute('data-rk');
             if (!key) return;
-
             if (key === 'ativo') {
                 regrasCorDraft[idx].ativo = !!target.checked;
             } else {
                 regrasCorDraft[idx][key] = target.value;
-            }
-
-            // Ao mudar o operador, rerenderiza para atualizar UI do campo Valor
-            if (key === 'operador') {
-                renderRegrasCorModal();
             }
         });
     }
@@ -4295,6 +4760,15 @@ document.addEventListener('DOMContentLoaded', function () {
         padding_vertical: {{ config.rotas_card_padding_vertical|default:12 }},
         padding_horizontal: {{ config.rotas_card_padding_horizontal|default:12 }},
         raio: {{ config.rotas_card_raio|default:8 }}
+    };
+
+    window.pedidosVisualConfigData = {
+        cor_fundo: '{{ config.pedidos_card_cor_fundo|default:"#ffffff" }}',
+        cor_borda: '{{ config.pedidos_card_cor_borda|default:"#e0e0e0" }}',
+        tamanho_fonte: {{ config.pedidos_card_tamanho_fonte|default:12 }},
+        padding_vertical: {{ config.pedidos_card_padding_vertical|default:8 }},
+        padding_horizontal: {{ config.pedidos_card_padding_horizontal|default:8 }},
+        raio: {{ config.pedidos_card_raio|default:8 }}
     };
     
     // Configuração de permissão de pedido em múltiplas rotas

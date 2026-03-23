@@ -180,35 +180,58 @@ def _normalize_regras_cor_config(raw_value):
         return []
 
     operadores_validos = {
-        'igual',
-        'diferente',
-        'contem',
-        'nao_contem',
-        'maior',
-        'maior_igual',
-        'menor',
-        'menor_igual',
-        'vazio',
-        'nao_vazio',
-        # operadores temporais
-        'dias_maior',
-        'dias_menor',
-        'dias_igual',
-        'hoje',
-        'horas_maior',
-        'horas_menor',
-        'dias_entre',
+        'igual', 'diferente', 'contem', 'nao_contem',
+        'maior', 'maior_igual', 'menor', 'menor_igual',
+        'vazio', 'nao_vazio',
+        'dias_maior', 'dias_menor', 'dias_igual', 'hoje',
+        'horas_maior', 'horas_menor', 'dias_entre',
     }
+
+    def _norm_op(op):
+        op = str(op or 'igual').strip().lower()
+        return op if op in operadores_validos else 'igual'
 
     normalized = []
     for item in raw_value:
         if not isinstance(item, dict):
             continue
 
-        campo = str(item.get('campo', '')).strip()
-        operador = str(item.get('operador', 'igual')).strip().lower()
-        valor = str(item.get('valor', '')).strip()
-        valor2 = str(item.get('valor2', '')).strip()
+        nome = str(item.get('nome', '')).strip()
+        logica = str(item.get('logica', 'AND')).upper()
+        if logica not in ('AND', 'OR'):
+            logica = 'AND'
+
+        # Suporta novo formato (condicoes[]) e antigo (campo/operador/valor no topo)
+        raw_condicoes = item.get('condicoes', None)
+        if isinstance(raw_condicoes, list) and raw_condicoes:
+            condicoes = []
+            for c in raw_condicoes:
+                if not isinstance(c, dict):
+                    continue
+                campo = str(c.get('campo', '')).strip()
+                if not campo:
+                    continue
+                condicoes.append({
+                    'campo': campo,
+                    'operador': _norm_op(c.get('operador', 'igual')),
+                    'valor': str(c.get('valor', '')).strip(),
+                    'valor2': str(c.get('valor2', '')).strip(),
+                })
+        elif item.get('campo'):
+            # Migração do formato antigo
+            campo = str(item.get('campo', '')).strip()
+            condicoes = [{
+                'campo': campo,
+                'operador': _norm_op(item.get('operador', 'igual')),
+                'valor': str(item.get('valor', '')).strip(),
+                'valor2': str(item.get('valor2', '')).strip(),
+            }]
+        else:
+            continue  # sem condições válidas, ignorar regra
+
+        if not condicoes:
+            continue
+
         cor_fundo = str(item.get('cor_fundo', '')).strip()
         cor_borda = str(item.get('cor_borda', '')).strip()
         cor_texto = str(item.get('cor_texto', '')).strip()
@@ -219,24 +242,17 @@ def _normalize_regras_cor_config(raw_value):
                 espessura_borda = ''
         except (TypeError, ValueError):
             espessura_borda = ''
+
         ativo = bool(item.get('ativo', True))
-
-        if not campo:
-            continue
-        if operador not in operadores_validos:
-            operador = 'igual'
-
-        prioridade_raw = item.get('prioridade', len(normalized) + 1)
         try:
-            prioridade = int(prioridade_raw)
+            prioridade = int(item.get('prioridade', len(normalized) + 1))
         except (TypeError, ValueError):
             prioridade = len(normalized) + 1
 
         normalized.append({
-            'campo': campo,
-            'operador': operador,
-            'valor': valor,
-            'valor2': valor2,
+            'nome': nome,
+            'logica': logica,
+            'condicoes': condicoes,
             'cor_fundo': cor_fundo,
             'cor_borda': cor_borda,
             'cor_texto': cor_texto,
@@ -245,7 +261,7 @@ def _normalize_regras_cor_config(raw_value):
             'ativo': ativo,
         })
 
-    normalized.sort(key=lambda x: (x.get('prioridade') or 9999, x.get('campo') or ''))
+    normalized.sort(key=lambda x: (x.get('prioridade') or 9999))
     return normalized
 
 
@@ -1053,6 +1069,32 @@ def salvar_config_visual_rotas(request):
     return JsonResponse({
         'success': True,
         'message': 'Configurações visuais salvas com sucesso!'
+    })
+
+
+@login_required
+@require_POST
+def salvar_config_visual_pedidos(request):
+    """Salva configurações visuais dos cards de pedidos"""
+    try:
+        payload = json.loads(request.body.decode('utf-8') or '{}')
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({'success': False, 'message': 'Payload JSON inválido.'}, status=400)
+
+    config, _ = ConfiguracaoUsuario.objects.get_or_create(usuario=request.user)
+
+    config.pedidos_card_cor_fundo = payload.get('pedidos_card_cor_fundo', '#ffffff')
+    config.pedidos_card_cor_borda = payload.get('pedidos_card_cor_borda', '#e0e0e0')
+    config.pedidos_card_tamanho_fonte = int(payload.get('pedidos_card_tamanho_fonte', 12))
+    config.pedidos_card_padding_vertical = int(payload.get('pedidos_card_padding_vertical', 8))
+    config.pedidos_card_padding_horizontal = int(payload.get('pedidos_card_padding_horizontal', 8))
+    config.pedidos_card_raio = int(payload.get('pedidos_card_raio', 8))
+
+    config.save()
+
+    return JsonResponse({
+        'success': True,
+        'message': 'Configurações visuais dos cards de pedidos salvas com sucesso!'
     })
 
 
