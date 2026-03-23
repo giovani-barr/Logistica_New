@@ -31,7 +31,48 @@ export const FONT_SIZE_PRESETS = [
 
 export function toNumber(raw) {
   if (raw == null || raw === '') return null
-  const normalized = String(raw).replace(/\./g, '').replace(',', '.')
+  if (typeof raw === 'number') {
+    return Number.isFinite(raw) ? raw : null
+  }
+
+  const str = String(raw).trim().replace(/\s+/g, '')
+  if (!str) return null
+
+  // Numero simples com ponto decimal (ex: 2000.10)
+  if (/^-?\d+(\.\d+)?$/.test(str)) {
+    const parsed = Number(str)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+
+  // Numero simples com virgula decimal (ex: 2000,10)
+  if (/^-?\d+(,\d+)?$/.test(str)) {
+    const parsed = Number(str.replace(',', '.'))
+    return Number.isFinite(parsed) ? parsed : null
+  }
+
+  // Milhar pt-BR (ex: 2.000,10)
+  if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(str)) {
+    const parsed = Number(str.replace(/\./g, '').replace(',', '.'))
+    return Number.isFinite(parsed) ? parsed : null
+  }
+
+  // Milhar en-US (ex: 2,000.10)
+  if (/^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(str)) {
+    const parsed = Number(str.replace(/,/g, ''))
+    return Number.isFinite(parsed) ? parsed : null
+  }
+
+  // Fallback para formatos mistos: usa o ultimo separador como decimal
+  const lastDot = str.lastIndexOf('.')
+  const lastComma = str.lastIndexOf(',')
+  let normalized = str
+
+  if (lastComma > lastDot) {
+    normalized = str.replace(/\./g, '').replace(',', '.')
+  } else if (lastDot > lastComma) {
+    normalized = str.replace(/,/g, '')
+  }
+
   const parsed = Number(normalized)
   return Number.isFinite(parsed) ? parsed : null
 }
