@@ -38,21 +38,46 @@ function parseCompId(id) {
   return { base: id }
 }
 
-// Agrupa itens consecutivos do tipo 'campo' numa mesma linha
-function groupComponents(ordem) {
-  const groups = []
-  let campoGroup = []
+const WIDTH_SPAN = {
+  full: 12,
+  two_thirds: 8,
+  half: 6,
+  one_third: 4,
+}
+
+function getLayoutWidth(layoutConfig, componentId) {
+  const raw = layoutConfig?.[componentId]?.width || 'full'
+  return Object.prototype.hasOwnProperty.call(WIDTH_SPAN, raw) ? raw : 'full'
+}
+
+// Agrupa componentes por linhas com base na largura configurada (grade de 12 colunas)
+function buildLayoutRows(ordem, layoutConfig) {
+  const rows = []
+  let current = []
+  let used = 0
+
   for (const id of ordem) {
-    const { base } = parseCompId(id)
-    if (base === 'campo') {
-      campoGroup.push(id)
-    } else {
-      if (campoGroup.length) { groups.push({ type: 'campo-row', ids: campoGroup }); campoGroup = [] }
-      groups.push({ type: 'single', id })
+    const width = getLayoutWidth(layoutConfig, id)
+    const span = WIDTH_SPAN[width] || WIDTH_SPAN.full
+
+    if (used + span > 12 && current.length) {
+      rows.push(current)
+      current = []
+      used = 0
+    }
+
+    current.push({ id, width, span })
+    used += span
+
+    if (used >= 12) {
+      rows.push(current)
+      current = []
+      used = 0
     }
   }
-  if (campoGroup.length) groups.push({ type: 'campo-row', ids: campoGroup })
-  return groups
+
+  if (current.length) rows.push(current)
+  return rows
 }
 
 export default function DashboardGrid({ aba, data, extraCache = {} }) {
@@ -248,45 +273,58 @@ export default function DashboardGrid({ aba, data, extraCache = {} }) {
     )
   }
 
-  const groups = groupComponents(visibleComponents)
+  const rows = useMemo(
+    () => buildLayoutRows(visibleComponents, aba.layout_config || {}),
+    [visibleComponents, aba.layout_config]
+  )
+
+  const getDesktopSpanClass = (span) => {
+    if (span >= 12) return 'lg:col-span-12'
+    if (span === 8) return 'lg:col-span-8'
+    if (span === 6) return 'lg:col-span-6'
+    if (span === 4) return 'lg:col-span-4'
+    return 'lg:col-span-12'
+  }
 
   return (
     <div className="flex-1 overflow-y-auto flex flex-col" style={{ padding: `${widgetPadding}px`, gap: `${gridGap}px` }}>
-      {groups.map((group, gi) => {
-        if (group.type === 'campo-row') {
-          // Linha de widgets de campo — flex row, altura fixa
-          return (
-            <div key={`row-${gi}`} className="flex flex-wrap" style={{ gap: `${gridGap}px` }}>
-              {group.ids.map(id => {
-                const { widgetId } = parseCompId(id)
-                const config = (aba.widget_configs || {})[widgetId] || {}
-                return (
-                  <div key={id} className="flex-1" style={{ minWidth: `${layoutPrefs?.fieldMinWidth || 160}px` }}>
-                    <FieldWidget
-                      widgetId={widgetId}
-                      config={config}
-                      data={data}
-                      columns={columns}
-                      onUpdate={handleUpdateWidget}
-                    />
-                  </div>
-                )
-              })}
-            </div>
-          )
-        }
-        // Widget normal
-        const { id } = group
-        const { base, sub } = parseCompId(id)
-        const heightKey = base === 'sql_extra' ? `sql_${sub}` : base
-        const expanded = isFullscreen || fullscreenWidget === id
-        return (
-          <WidgetCard key={id} id={id} height={getWidgetHeight(heightKey || base)}>
-            {renderWidget(id, expanded)}
-          </WidgetCard>
-        )
-      })}
-      {groups.length === 0 && (
+      {rows.map((row, rowIdx) => (
+        <div key={`row-${rowIdx}`} className="grid grid-cols-1 lg:grid-cols-12" style={{ gap: `${gridGap}px` }}>
+          {row.map((item) => {
+            const { id, span } = item
+            const { base, sub } = parseCompId(id)
+            const expanded = isFullscreen || fullscreenWidget === id
+            const spanClass = getDesktopSpanClass(span)
+
+            if (base === 'campo') {
+              const { widgetId } = parseCompId(id)
+              const config = (aba.widget_configs || {})[widgetId] || {}
+              return (
+                <div key={id} className={`min-w-0 ${spanClass}`}>
+                  <FieldWidget
+                    widgetId={widgetId}
+                    config={config}
+                    data={data}
+                    columns={columns}
+                    onUpdate={handleUpdateWidget}
+                    expanded={expanded}
+                  />
+                </div>
+              )
+            }
+
+            const heightKey = base === 'sql_extra' ? `sql_${sub}` : base
+            return (
+              <div key={id} className={`min-w-0 ${spanClass}`}>
+                <WidgetCard id={id} height={getWidgetHeight(heightKey || base)}>
+                  {renderWidget(id, expanded)}
+                </WidgetCard>
+              </div>
+            )
+          })}
+        </div>
+      ))}
+      {rows.length === 0 && (
         <div className={`flex-1 flex items-center justify-center text-sm ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
           Nenhum componente visível. Configure em ⚙ Config.
         </div>

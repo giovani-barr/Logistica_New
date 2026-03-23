@@ -59,6 +59,18 @@ const COMPONENT_LABELS = {
   detalhe: 'Painel de Detalhe',
 }
 
+const LAYOUT_WIDTH_OPTIONS = [
+  { value: 'full', label: '100% (linha inteira)' },
+  { value: 'two_thirds', label: '66% (dois terços)' },
+  { value: 'half', label: '50% (meia largura)' },
+  { value: 'one_third', label: '33% (um terço)' },
+]
+
+const LAYOUT_WIDTH_LABEL = LAYOUT_WIDTH_OPTIONS.reduce((acc, item) => {
+  acc[item.value] = item.label
+  return acc
+}, {})
+
 // Mapa tipo → campo legado da aba
 const TIPO_FIELDS = {
   kpis: 'kpis_config',
@@ -130,6 +142,15 @@ function extractSqlParams(sqlText) {
 }
 
 function normalizeSqlDraft(aba) {
+  const rawLayout = aba.layout_config || {}
+  const normalizedLayout = Object.entries(rawLayout).reduce((acc, [key, value]) => {
+    const width = LAYOUT_WIDTH_OPTIONS.some((opt) => opt.value === value?.width)
+      ? value.width
+      : 'full'
+    acc[key] = { width }
+    return acc
+  }, {})
+
   return {
     ...aba,
     campos_join: aba.campos_join || [],
@@ -146,7 +167,7 @@ function normalizeSqlDraft(aba) {
       item.startsWith('sql_extra:') ||
       SQL_COMPONENTS.some(t => item.startsWith(t + ':'))
     ),
-    layout_config: aba.layout_config || {},
+    layout_config: normalizedLayout,
   }
 }
 
@@ -401,10 +422,15 @@ export default function ConfigModal() {
   const addWidget = () => {
     const id = `w${Date.now()}`
     const col = availableColumns[0] || ''
+    const compId = `campo:${id}`
     updateCurrentAba(current => ({
       ...current,
       widget_configs: { ...(current.widget_configs || {}), [id]: { coluna: col, agregacao: 'first', label: col, estilo: {} } },
-      componentes_ordem: [...(current.componentes_ordem || []), `campo:${id}`],
+      componentes_ordem: [...(current.componentes_ordem || []), compId],
+      layout_config: {
+        ...(current.layout_config || {}),
+        [compId]: { width: 'full' },
+      },
     }))
   }
 
@@ -412,10 +438,14 @@ export default function ConfigModal() {
     updateCurrentAba(current => {
       const next = { ...(current.widget_configs || {}) }
       delete next[widgetId]
+      const compId = `campo:${widgetId}`
       return {
         ...current,
         widget_configs: next,
-        componentes_ordem: (current.componentes_ordem || []).filter(c => c !== `campo:${widgetId}`),
+        componentes_ordem: (current.componentes_ordem || []).filter(c => c !== compId),
+        layout_config: Object.fromEntries(
+          Object.entries(current.layout_config || {}).filter(([key]) => key !== compId)
+        ),
       }
     })
   }
@@ -436,8 +466,14 @@ export default function ConfigModal() {
   }
 
   const removeSqlExtra = (idLocal) => {
-    update('sqls_extras', (aba.sqls_extras || []).filter(e => e.id_local !== idLocal))
-    update('componentes_ordem', (aba.componentes_ordem || []).filter(c => !c.startsWith(`sql_extra:${idLocal}:`)))
+    updateCurrentAba((current) => ({
+      ...current,
+      sqls_extras: (current.sqls_extras || []).filter(e => e.id_local !== idLocal),
+      componentes_ordem: (current.componentes_ordem || []).filter(c => !c.startsWith(`sql_extra:${idLocal}:`)),
+      layout_config: Object.fromEntries(
+        Object.entries(current.layout_config || {}).filter(([key]) => !key.startsWith(`sql_extra:${idLocal}:`))
+      ),
+    }))
   }
 
   const updateSqlExtra = (idLocal, field, value) => {
@@ -488,7 +524,14 @@ export default function ConfigModal() {
   const addSqlExtraComponent = (idLocal, sub) => {
     const key = `sql_extra:${idLocal}:${sub}`
     if ((aba.componentes_ordem || []).includes(key)) return
-    update('componentes_ordem', [...(aba.componentes_ordem || []), key])
+    updateCurrentAba((current) => ({
+      ...current,
+      componentes_ordem: [...(current.componentes_ordem || []), key],
+      layout_config: {
+        ...(current.layout_config || {}),
+        [key]: { width: 'full' },
+      },
+    }))
   }
 
   const handleLoadColumnsForExtra = async (idLocal) => {
@@ -542,6 +585,32 @@ export default function ConfigModal() {
     update('componentes_ordem', reorder(current, sourceIndex, targetIndex))
   }
 
+  const getComponentLayout = useCallback((componentId) => {
+    const entry = (aba?.layout_config || {})[componentId] || {}
+    const width = LAYOUT_WIDTH_OPTIONS.some((opt) => opt.value === entry.width)
+      ? entry.width
+      : 'full'
+    return { width }
+  }, [aba?.layout_config])
+
+  const setComponentLayout = useCallback((componentId, patch) => {
+    updateCurrentAba((current) => {
+      const currentEntry = (current.layout_config || {})[componentId] || {}
+      const nextWidth = patch.width ?? currentEntry.width ?? 'full'
+      const width = LAYOUT_WIDTH_OPTIONS.some((opt) => opt.value === nextWidth)
+        ? nextWidth
+        : 'full'
+
+      return {
+        ...current,
+        layout_config: {
+          ...(current.layout_config || {}),
+          [componentId]: { width },
+        },
+      }
+    })
+  }, [updateCurrentAba])
+
   const addComponent = (tipo) => {
     // Para SQL_COMPONENTS, sempre cria uma nova instância nomeada (tipo:instanceId)
     const instanceId = Math.random().toString(36).slice(2, 8)
@@ -551,6 +620,10 @@ export default function ConfigModal() {
       ...current,
       componentes_ordem: [...(current.componentes_ordem || []), compId],
       widget_configs: { ...(current.widget_configs || {}), [instanceId]: defaultCfg },
+      layout_config: {
+        ...(current.layout_config || {}),
+        [compId]: { width: 'full' },
+      },
     }))
     return instanceId
   }
@@ -569,6 +642,9 @@ export default function ConfigModal() {
         ...current,
         componentes_ordem: (current.componentes_ordem || []).filter((item) => item !== id),
         widget_configs: wc,
+        layout_config: Object.fromEntries(
+          Object.entries(current.layout_config || {}).filter(([key]) => key !== id)
+        ),
       }
     })
   }
@@ -577,23 +653,34 @@ export default function ConfigModal() {
     const nextSqlId = value ? Number(value) : null
     const nextSql = sqls.find((item) => item.id === nextSqlId)
     const nextParams = extractSqlParams(nextSql?.sql_text || '')
-    updateCurrentAba((current) => normalizeSqlDraft({
-      ...current,
-      sql_extra_id: nextSqlId,
-      campos_join: nextParams.map((param) => {
-        const existing = (current.campos_join || []).find((item) => item.coluna_sql === param)
-        return {
-          coluna_sql: param,
-          campo_pedido: existing?.campo_pedido || autoMatchPedidoField(param),
-        }
-      }),
-      colunas_visiveis: current.sql_extra_id === nextSqlId ? current.colunas_visiveis : [],
-      kpis_config: current.sql_extra_id === nextSqlId ? current.kpis_config : [],
-      grafico_config: current.sql_extra_id === nextSqlId
-        ? current.grafico_config
-        : { tipo: 'bar', label_col: '', series: [], format: 'auto', stacked: false, show_legend: true, show_data_labels: false, visivel: true },
-      componentes_ordem: current.sql_extra_id === nextSqlId ? current.componentes_ordem : [...SQL_COMPONENTS],
-    }))
+    updateCurrentAba((current) => {
+      const nextOrder = current.sql_extra_id === nextSqlId ? current.componentes_ordem : [...SQL_COMPONENTS]
+      const nextLayout = Object.fromEntries(
+        Object.entries(current.layout_config || {}).filter(([key]) => (nextOrder || []).includes(key))
+      )
+      ;(nextOrder || []).forEach((key) => {
+        if (!nextLayout[key]) nextLayout[key] = { width: 'full' }
+      })
+
+      return normalizeSqlDraft({
+        ...current,
+        sql_extra_id: nextSqlId,
+        campos_join: nextParams.map((param) => {
+          const existing = (current.campos_join || []).find((item) => item.coluna_sql === param)
+          return {
+            coluna_sql: param,
+            campo_pedido: existing?.campo_pedido || autoMatchPedidoField(param),
+          }
+        }),
+        colunas_visiveis: current.sql_extra_id === nextSqlId ? current.colunas_visiveis : [],
+        kpis_config: current.sql_extra_id === nextSqlId ? current.kpis_config : [],
+        grafico_config: current.sql_extra_id === nextSqlId
+          ? current.grafico_config
+          : { tipo: 'bar', label_col: '', series: [], format: 'auto', stacked: false, show_legend: true, show_data_labels: false, visivel: true },
+        componentes_ordem: nextOrder,
+        layout_config: nextLayout,
+      })
+    })
     setLoadedColumns([])
   }
 
@@ -1746,6 +1833,9 @@ export default function ConfigModal() {
                             <div className={`${cls.helper} mb-2`}>Arraste para definir a ordem dos blocos da aba SQL.</div>
                             <div className={`rounded-lg border min-h-[140px] p-2 space-y-1 ${dark ? 'border-slate-700 bg-slate-950/40' : 'border-slate-200 bg-slate-50/70'}`}>
                               {(aba.componentes_ordem || []).map((component, index) => (
+                                (() => {
+                                  const layout = getComponentLayout(component)
+                                  return (
                                 <div
                                   key={component}
                                   draggable
@@ -1758,19 +1848,42 @@ export default function ConfigModal() {
                                     if ((aba.componentes_ordem || []).includes(dragged)) {
                                       moveComponent(dragged, index)
                                     } else {
-                                      const next = [...(aba.componentes_ordem || [])]
-                                      next.splice(index, 0, dragged)
-                                      update('componentes_ordem', unique(next))
+                                      const instanceId = Math.random().toString(36).slice(2, 8)
+                                      const compId = `${dragged}:${instanceId}`
+                                      const defaultCfg = getDefaultInstanceConfig(dragged)
+                                      updateCurrentAba((current) => {
+                                        const next = [...(current.componentes_ordem || [])]
+                                        next.splice(index, 0, compId)
+                                        return {
+                                          ...current,
+                                          componentes_ordem: unique(next),
+                                          widget_configs: { ...(current.widget_configs || {}), [instanceId]: defaultCfg },
+                                          layout_config: { ...(current.layout_config || {}), [compId]: { width: 'full' } },
+                                        }
+                                      })
                                     }
                                   }}
                                   className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs ${dark ? 'bg-slate-800 text-slate-300' : 'bg-white text-slate-700 border border-slate-200'}`}
                                 >
                                   <GripVertical size={11} className="opacity-40" />
                                   <span className="flex-1">{getCompLabel(component, aba.widget_configs, aba.sqls_extras, aba.componentes_ordem)}</span>
+                                  <select
+                                    value={layout.width}
+                                    onChange={(event) => setComponentLayout(component, { width: event.target.value })}
+                                    className={`rounded-md border px-2 py-1 text-[11px] ${dark ? 'bg-slate-900 border-slate-600 text-slate-200' : 'bg-white border-slate-300 text-slate-700'}`}
+                                    title={`Largura: ${LAYOUT_WIDTH_LABEL[layout.width] || layout.width}`}
+                                  >
+                                    {LAYOUT_WIDTH_OPTIONS.map((opt) => (
+                                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                    ))}
+                                  </select>
                                   <button onClick={() => removeComponent(component)} className={cls.btnDanger}><Trash2 size={12} /></button>
                                 </div>
+                                  )
+                                })()
                               ))}
                             </div>
+                            <div className={`${cls.helper} mt-2`}>No desktop, a largura define quem fica lado a lado. No mobile, todos empilham em 100%.</div>
                           </div>
                           <div>
                             <div className={`${cls.helper} mb-2`}>Biblioteca de componentes</div>

@@ -34,6 +34,16 @@ function normalizeLayoutPrefs(prefs) {
   }
 }
 
+function normalizeLayoutConfig(layoutConfig) {
+  const allowed = new Set(['full', 'two_thirds', 'half', 'one_third'])
+  const raw = layoutConfig || {}
+  return Object.entries(raw).reduce((acc, [key, value]) => {
+    const width = allowed.has(value?.width) ? value.width : 'full'
+    acc[key] = { width }
+    return acc
+  }, {})
+}
+
 function normalizeAba(aba) {
   return {
     ...aba,
@@ -48,7 +58,7 @@ function normalizeAba(aba) {
     sqls_extras: aba.sqls_extras || [],
     detail_config: aba.detail_config || {},
     componentes_ordem: aba.componentes_ordem || ['kpis', 'tabela', 'grafico', 'pivot', 'detalhe'],
-    layout_config: aba.layout_config || {},
+    layout_config: normalizeLayoutConfig(aba.layout_config),
     texto: aba.texto || '',
   }
 }
