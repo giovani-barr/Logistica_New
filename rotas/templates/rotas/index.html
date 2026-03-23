@@ -931,7 +931,7 @@
             grid-column: 1 / -1;
         }
         .card-fields-main input[type="checkbox"] { margin-top: 0; }
-        .card-fields-name { font-weight: 700; color:#0f172a; }
+        .card-fields-name { font-weight: 700; color:#0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
         .card-fields-order {
             margin-left: auto;
             display: inline-flex;
@@ -961,10 +961,84 @@
         }
         .card-fields-config {
             display:grid;
-            grid-template-columns: 1.2fr .7fr .7fr .7fr .8fr .8fr .8fr;
+            grid-template-columns: 1.2fr .7fr 2rem .7fr .8fr .8fr .8fr;
             gap:6px;
             width:100%;
             grid-column: 1 / -1;
+        }
+        /* seletor de cor */
+        .cor-picker-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .cor-swatch-btn {
+            width: 32px;
+            height: 28px;
+            border: 2px solid #94a3b8;
+            border-radius: 6px;
+            cursor: pointer;
+            padding: 0;
+            transition: border-color .15s, transform .1s;
+            flex-shrink: 0;
+        }
+        .cor-swatch-btn:hover { border-color: #475569; transform: scale(1.08); }
+        .cor-picker-popup {
+            position: fixed;
+            z-index: 10000;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            box-shadow: 0 8px 28px rgba(0,0,0,.22);
+            padding: 10px;
+            min-width: 220px;
+            display: none;
+        }
+        .cor-picker-popup.open { display: block; }
+        .cor-picker-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #64748b;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: .05em;
+        }
+        .cor-picker-grid {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+        .cor-picker-color {
+            width: 22px;
+            height: 22px;
+            border-radius: 4px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: transform .12s, border-color .12s;
+        }
+        .cor-picker-color:hover { transform: scale(1.25); border-color: #334155; }
+        .cor-picker-color.selected { border-color: #0f172a; transform: scale(1.15); }
+        .cor-picker-sep {
+            height: 1px;
+            background: #e5e7eb;
+            margin: 6px 0;
+        }
+        .cor-picker-custom {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: #374151;
+            cursor: pointer;
+        }
+        .cor-picker-custom input[type=color] {
+            width: 28px;
+            height: 24px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            padding: 1px 2px;
+            cursor: pointer;
         }
         .card-fields-config input,
         .card-fields-config select {
@@ -2641,7 +2715,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 <div class="card-fields-config">
                     <input type="text" data-k="rotulo" value="${item.rotulo || ''}" placeholder="Rótulo">
                     <input type="text" data-k="icone" value="${item.icone || ''}" placeholder="Ícone">
-                    <input type="text" data-k="cor" value="${item.cor || ''}" placeholder="#334155">
+                    <div class="cor-picker-wrap">
+                        <button type="button" class="cor-swatch-btn" data-action="open-cor-picker"
+                            style="background:${item.cor || '#e2e8f0'}" title="${item.cor || 'Sem cor'}"></button>
+                        <input type="hidden" data-k="cor" value="${item.cor || ''}">
+                    </div>
                     <input type="number" data-k="tamanho" value="${item.tamanho || ''}" min="8" max="28" placeholder="Fonte">
                     <select data-k="posicao">
                         <option value="esquerda" ${item.posicao === 'esquerda' ? 'selected' : ''}>Esquerda</option>
@@ -3461,6 +3539,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 [camposCardDraft[idx + 1], camposCardDraft[idx]] = [camposCardDraft[idx], camposCardDraft[idx + 1]];
                 renderCamposModal();
             }
+            if (action === 'open-cor-picker') {
+                abrirCorPicker(button, campo);
+                event.stopPropagation();
+            }
         });
 
         cardFieldsListEl.addEventListener('input', function (event) {
@@ -3499,6 +3581,142 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
+    // ── Seletor visual de cor ──────────────────────────────────
+    (function initCorPicker() {
+        const COR_PALETTE = [
+            // Slate/neutros escuros
+            '#0f172a','#1e293b','#334155','#475569','#64748b','#94a3b8','#e2e8f0','#f8fafc',
+            // Vermelhos/Rosas
+            '#7f1d1d','#dc2626','#ef4444','#f87171','#ec4899','#f472b6','#fbcfe8','#fce7f3',
+            // Laranjas/Amarelos
+            '#78350f','#b45309','#f59e0b','#fbbf24','#fde047','#fef08a','#fef9c3','#fffbeb',
+            // Verdes
+            '#14532d','#15803d','#16a34a','#22c55e','#4ade80','#86efac','#bbf7d0','#dcfce7',
+            // Teal/Ciano
+            '#164e63','#0e7490','#0891b2','#06b6d4','#22d3ee','#67e8f9','#a5f3fc','#ecfeff',
+            // Azuis
+            '#1e3a8a','#1e40af','#1d4ed8','#3b82f6','#60a5fa','#93c5fd','#bfdbfe','#eff6ff',
+            // Indigo/Violeta
+            '#312e81','#3730a3','#4338ca','#7c3aed','#8b5cf6','#a78bfa','#c4b5fd','#f5f3ff',
+            // Cinzas neutros
+            '#111827','#374151','#6b7280','#9ca3af','#d1d5db','#e5e7eb','#f3f4f6','#ffffff',
+        ];
+
+        // Criar popup no body
+        const popup = document.createElement('div');
+        popup.id = 'cor-picker-popup';
+        popup.className = 'cor-picker-popup';
+        popup.innerHTML = `
+            <div class="cor-picker-title">Escolher cor</div>
+            <div class="cor-picker-grid">
+                ${COR_PALETTE.map(c => `<div class="cor-picker-color" data-cor="${c}" style="background:${c}" title="${c}"></div>`).join('')}
+            </div>
+            <div class="cor-picker-sep"></div>
+            <label class="cor-picker-custom">
+                <input type="color" id="cor-picker-native" value="#334155">
+                <span>Personalizado</span>
+            </label>
+        `;
+        document.body.appendChild(popup);
+
+        let _activeSwatch = null;   // botão swatch clicado
+        let _activeCampo  = null;   // nome do campo em edição
+        let _activeHidden = null;   // hidden input data-k="cor"
+
+        function applyColor(hex, close = true) {
+            if (!_activeCampo) return;
+            const item = camposCardDraft.find(x => x.campo === _activeCampo);
+            if (item) item.cor = hex;
+            if (_activeHidden) _activeHidden.value = hex;
+            if (_activeSwatch) {
+                _activeSwatch.style.background = hex;
+                _activeSwatch.title = hex;
+            }
+            // Marcar cor selecionada na grade
+            popup.querySelectorAll('.cor-picker-color').forEach(el => {
+                el.classList.toggle('selected', el.dataset.cor === hex);
+            });
+            if (close) fecharCorPicker();
+        }
+
+        function fecharCorPicker() {
+            popup.classList.remove('open');
+            _activeSwatch = null;
+            _activeCampo  = null;
+            _activeHidden = null;
+        }
+
+        window.abrirCorPicker = function(swatchBtn, campo) {
+            _activeSwatch = swatchBtn;
+            _activeCampo  = campo;
+            // Encontrar hidden input no mesmo wrapper
+            const wrap = swatchBtn.closest('.cor-picker-wrap');
+            _activeHidden = wrap ? wrap.querySelector('input[data-k="cor"]') : null;
+
+            const corAtual = (_activeHidden ? _activeHidden.value : '') || '';
+            // Atualizar native input e destacar cor selecionada na grade
+            const nativeInput = popup.querySelector('#cor-picker-native');
+            if (nativeInput && corAtual) nativeInput.value = corAtual;
+            popup.querySelectorAll('.cor-picker-color').forEach(el => {
+                el.classList.toggle('selected', el.dataset.cor === corAtual);
+            });
+
+            // Posicionar popup
+            const rect = swatchBtn.getBoundingClientRect();
+            popup.style.top  = (rect.bottom + 4) + 'px';
+            popup.style.left = rect.left + 'px';
+            popup.classList.add('open');
+
+            // Ajustar se sair da tela
+            requestAnimationFrame(function() {
+                const pr = popup.getBoundingClientRect();
+                if (pr.right > window.innerWidth - 8) {
+                    popup.style.left = Math.max(4, window.innerWidth - pr.width - 8) + 'px';
+                }
+                if (pr.bottom > window.innerHeight - 8) {
+                    popup.style.top = Math.max(4, rect.top - pr.height - 4) + 'px';
+                }
+            });
+        };
+
+        // Click em cor da paleta
+        popup.addEventListener('click', function(e) {
+            const cel = e.target.closest('.cor-picker-color');
+            if (cel) {
+                applyColor(cel.dataset.cor, true);
+                e.stopPropagation();
+                return;
+            }
+            e.stopPropagation();
+        });
+
+        // Color picker nativo
+        const nativeInput = popup.querySelector('#cor-picker-native');
+        if (nativeInput) {
+            nativeInput.addEventListener('input', function() {
+                applyColor(nativeInput.value, false);
+            });
+            nativeInput.addEventListener('change', function() {
+                applyColor(nativeInput.value, true);
+            });
+        }
+
+        // Fechar ao clicar fora
+        document.addEventListener('click', function(e) {
+            if (popup.classList.contains('open') && !popup.contains(e.target)) {
+                fecharCorPicker();
+            }
+        });
+
+        // Fechar ao pressionar Escape
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && popup.classList.contains('open')) {
+                fecharCorPicker();
+            }
+        });
+    })();
+    // ── fim Seletor visual de cor ──────────────────────────────
+
     if (btnCamposTodos && cardFieldsListEl) {
         btnCamposTodos.addEventListener('click', function () {
             camposCardDraft.forEach(item => item.selected = true);
