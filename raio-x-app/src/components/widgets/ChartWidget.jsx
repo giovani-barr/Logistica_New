@@ -38,8 +38,9 @@ const VALUE_FORMATS = [
 ]
 
 // ── Formatador de valores ─────────────────────────────────────────────────────
+import { toNumber as _toNumber } from '../../utils/valueFormatting'
 function formatValue(val, fmt) {
-  const n = parseFloat(val)
+  const n = _toNumber(val) ?? NaN
   if (isNaN(n)) return String(val ?? '')
   switch (fmt) {
     case 'compact': {

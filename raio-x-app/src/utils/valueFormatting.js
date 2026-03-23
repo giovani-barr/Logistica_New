@@ -29,7 +29,7 @@ export const FONT_SIZE_PRESETS = [
   { value: '4xl', label: 'XXG', size: 36, expandedSize: 52 },
 ]
 
-function toNumber(raw) {
+export function toNumber(raw) {
   if (raw == null || raw === '') return null
   const normalized = String(raw).replace(/\./g, '').replace(',', '.')
   const parsed = Number(normalized)

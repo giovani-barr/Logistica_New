@@ -9,6 +9,7 @@ import {
   VERTICAL_ALIGN_OPTIONS,
   formatValue,
   resolveFontSize,
+  toNumber,
 } from '../../utils/valueFormatting'
 
 const AGREGACOES = [
@@ -26,7 +27,7 @@ const AGREGACOES = [
 function computeValue(data, coluna, agregacao) {
   if (!data?.length || !coluna) return '—'
   const rawVals = data.map(r => r[coluna])
-  const nums = rawVals.map(v => parseFloat(v)).filter(v => !isNaN(v))
+  const nums = rawVals.map(v => toNumber(v)).filter(v => v != null)
   switch (agregacao) {
     case 'count':  return data.length
     case 'sum':    return nums.length ? +nums.reduce((a, b) => a + b, 0).toFixed(4) : '—'

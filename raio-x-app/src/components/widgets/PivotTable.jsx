@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import { useRaioX } from '../../context/RaioXContext'
+import { toNumber } from '../../utils/valueFormatting'
 
 function pivotize(data, rowField, colField, valueField, aggregation) {
   if (!rowField || !colField || !valueField || !data.length) {
@@ -20,7 +21,7 @@ function pivotize(data, rowField, colField, valueField, aggregation) {
 
   const cells = {}
   Object.entries(groups).forEach(([key, vals]) => {
-    const nums = vals.map(v => parseFloat(v)).filter(v => !isNaN(v))
+    const nums = vals.map(v => toNumber(v)).filter(v => v != null)
     let result
     switch (aggregation) {
       case 'sum':   result = nums.reduce((a, b) => a + b, 0); break

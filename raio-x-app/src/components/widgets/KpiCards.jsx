@@ -1,4 +1,5 @@
 import { useRaioX } from '../../context/RaioXContext'
+import { toNumber } from '../../utils/valueFormatting'
 
 export default function KpiCards({ data, config, abaId, expanded = false }) {
   const { theme } = useRaioX()
@@ -9,7 +10,7 @@ export default function KpiCards({ data, config, abaId, expanded = false }) {
   const kpis = config.map(kpi => {
     const { coluna, agregacao, label } = kpi
     const rawVals = data.map(r => r[coluna])
-    const nums = rawVals.map(v => parseFloat(v)).filter(v => !isNaN(v))
+    const nums = rawVals.map(v => toNumber(v)).filter(v => v != null)
     let value
     switch (agregacao) {
       case 'count':  value = data.length; break

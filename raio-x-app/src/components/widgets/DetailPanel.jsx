@@ -1,9 +1,9 @@
 import { useRaioX } from '../../context/RaioXContext'
-import { formatValue, resolveFontSize } from '../../utils/valueFormatting'
+import { formatValue, resolveFontSize, toNumber } from '../../utils/valueFormatting'
 
 function getColor(raw, cell) {
   if (cell.cor_fixo) return cell.cor_fixo
-  const n = parseFloat(String(raw ?? '').replace(',', '.'))
+  const n = toNumber(raw) ?? NaN
   if (isNaN(n)) return null
   if (n > 0 && cell.cor_pos) return cell.cor_pos
   if (n < 0 && cell.cor_neg) return cell.cor_neg
